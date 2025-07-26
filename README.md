@@ -130,24 +130,8 @@ Generates PNGs for plant graphs. Use `stich_visualize` for stitched Petri nets.
 
 ---
 
-## 10. Based on / Credits
-- **DiGress**: *Discrete Denoising Diffusion for Graph Generation* (Vignac et al., 2022). Environment & some metric utilities are adapted.  
-Please cite both my thesis and DiGress if you use this code.
 
-```bibtex
-@mastersthesis{vonPlessing2025,
-  title  = {Hierarchical Diffusion Generation of Industrial Graphs and Petri Nets},
-  author = {Thomas von Plessing},
-  school = {Politecnico di Milano},
-  year   = {2025}
-}
-```
-
----
-
-## 11. License
+## 10. License
 MIT — see [LICENSE](LICENSE).
 
----
 
-**Contact:** tvonplessing[at]correo.cl

@@ -82,6 +82,9 @@ def _save_graphs_pt(tag: str, batch: list[dict]) -> None:
 # --------------------------------------------------------------------------
 # Load training graphs – needed for Novelty %
 # --------------------------------------------------------------------------
+
+#below only for evaluating
+#####################################
 print("Loading training graphs …")
 train = torch.load("graphs_data.pt")
 train_hash_by_size = collections.defaultdict(set)
@@ -91,7 +94,7 @@ for A, types in zip(train["adjacency_matrices"], train["node_types"]):
     emat = torch.tensor(A, dtype=torch.long)
     h    = wl_hash(nlab, emat)
     train_hash_by_size[len(types)].add(h)
-
+######################################
 # --------------------------------------------------------------------------
 # Load pretrained models
 # --------------------------------------------------------------------------
@@ -115,6 +118,7 @@ petri_models[3].load_state_dict(torch.load("petri_disassembly_model.pth",
 
 
 pipeline = IntegratedDiffusionPipeline(plant_model, petri_models, device)
+print('model loaded')
 
 # --------------------------------------------------------------------------
 # Metric evaluator
@@ -323,7 +327,32 @@ def extra_metrics(batch, tag=""):
 # Main
 # --------------------------------------------------------------------------
 if __name__ == "__main__":
-    torch.manual_seed(0); random.seed(0)
-    experiment_free()       # E1
-    experiment_allpinned()  # E2
-    experiment_partial()    # E3
+
+############### generate industrial graphs
+    # torch.manual_seed(42); random.seed(42)
+    # experiment_free(n_samples=10)       # E1
+    # experiment_allpinned(n_samples=1, inv=(3,4,2,1))  # E2
+    # experiment_partial(n_samples=10)    # E3
+
+################ generate petrinet
+    # from integrated_diffusion import IntegratedDiffusionPipeline
+    #
+    # pipeline = IntegratedDiffusionPipeline(plant_model, petri_models, device)
+    #
+    # from torch_geometric.data import Data
+    # petri_nodes, petri_edges = pipeline.generate_petri_subgraph(node_type=0, n_nodes_petri=8)
+    #
+    # n_nodes = len(petri_nodes)
+    # edge_index = (petri_edges[0] != 0).nonzero(as_tuple=False).t().contiguous()  # shape [2, num_edges]
+    # x = torch.nn.functional.one_hot(petri_nodes, num_classes=2).float()  # shape [n_nodes, 2]
+    # graph_data = Data(x=x, edge_index=edge_index)
+    #
+    # torch.save([graph_data], 'petri_net.pt')
+
+
+
+################ generate integrated graph
+    integ = pipeline.generate_full_integrated_graph(n_nodes_global=15, n_nodes_petri=8)
+    torch.save(integ, "graphs_data_tmp.pt")
+
+    pipeline.stitch("graphs_data_tmp.pt", save_path="./stitched_graph.pt")

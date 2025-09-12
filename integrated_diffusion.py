@@ -39,7 +39,8 @@ class IntegratedDiffusionPipeline:
     def generate_full_integrated_graph(self, n_nodes_global, n_nodes_petri=10, output_dir='integrated_graph'):
         os.makedirs(output_dir, exist_ok=True)
 
-        global_node_types, global_edges = self.generate_global_graph(n_nodes_global)
+        # global_node_types, global_edges = self.generate_global_graph(n_nodes_global) ## generate again
+        global_node_types, global_edges = self.generate_global_graph_all_pinned(5,4,3,2) ## generate again
 
         # Convertir edges globales a matriz de adyacencia claramente
         global_adj_matrix = global_edges.squeeze(0).cpu().numpy()

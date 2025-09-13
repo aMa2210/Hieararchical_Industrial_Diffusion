@@ -9,13 +9,13 @@ data = torch.load(file_path)
 adjacency_data = data['adjacency_matrices']
 node_types = data['node_types']
 
-# 取第0个图
+
 adj = adjacency_data[0]
 G = nx.from_numpy_array(adj)
 
-# node_types[0] 是一个 list，里面是字符串
+
 types = node_types[0]
-print(types)  # 打印前10个看看是什么
+print(types)
 
 color_map = {
     "MACHINE": "skyblue",

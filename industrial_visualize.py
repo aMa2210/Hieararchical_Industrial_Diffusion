@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import os
 
 # Carga los grafos generados
-final_graphs = torch.load('allpinned_graphs/final_graphs.pt')
+# final_graphs = torch.load('allpinned_graphs/final_graphs.pt')
 
-# final_graphs = torch.load("exp_outputs/E2_20250912_113248.pt")
+final_graphs = torch.load("exp_outputs/E2_20250912_113248.pt")
 # Crear carpeta para guardar imágenes
 output_folder = 'industrial_graph_images_tmp'
 os.makedirs(output_folder, exist_ok=True)

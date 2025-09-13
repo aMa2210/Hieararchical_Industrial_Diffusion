@@ -10,7 +10,6 @@ import os
 # graphs = torch.load('generated_graphs/final_graphs.pt')
 graphs = torch.load('petri_net.pt')
 
-
 print(type(graphs))
 
 output_image_dir = 'petri_net_images'

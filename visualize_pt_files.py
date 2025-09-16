@@ -8,7 +8,7 @@ import numpy as np
 # -----------------------------
 # file_path = "petri_assembly_dataset/processed/train_processed.pt"
 # file_path="petri_assembly_dataset/raw/train.pt"
-file_path = "exp_outputs/E2.pt"
+file_path = "exp_outputs/E2_20250916_161959.pt"
 max_graphs_to_show = 10  # max visualization data
 
 node_styles = {

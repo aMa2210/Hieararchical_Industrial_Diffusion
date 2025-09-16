@@ -331,7 +331,7 @@ if __name__ == "__main__":
 ############### generate industrial graphs
     # torch.manual_seed(42); random.seed(42)
     # experiment_free(n_samples=10)       # E1
-    # experiment_allpinned(n_samples=1, inv=(3,4,2,1))  # E2
+    experiment_allpinned(n_samples=10, inv=(2,6,2,2))  # E2
     # experiment_partial(n_samples=10)    # E3
 
 ################ generate petrinet
@@ -352,7 +352,7 @@ if __name__ == "__main__":
 
 
 ################ generate integrated graph
-    integ = pipeline.generate_full_integrated_graph(n_nodes_global=15, n_nodes_petri=8)
+    # integ = pipeline.generate_full_integrated_graph(n_nodes_global=15, n_nodes_petri=8)
     # torch.save(integ, "graphs_data_tmp.pt")
-
-    pipeline.stitch("integrated_graph/integrated_graph.pt", save_path="./stitched_graph.pt")
+    #
+    # pipeline.stitch("graphs_data_tmp.pt", save_path="./stitched_graph.pt")

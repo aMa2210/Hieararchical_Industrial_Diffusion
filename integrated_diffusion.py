@@ -40,7 +40,7 @@ class IntegratedDiffusionPipeline:
         os.makedirs(output_dir, exist_ok=True)
 
         # global_node_types, global_edges = self.generate_global_graph(n_nodes_global) ## generate again
-        global_node_types, global_edges = self.generate_global_graph_all_pinned(5,4,3,2) ## generate again
+        global_node_types, global_edges = self.generate_global_graph_all_pinned(2,8,2,2) ## generate again
 
         # Convertir edges globales a matriz de adyacencia claramente
         global_adj_matrix = global_edges.squeeze(0).cpu().numpy()
@@ -122,7 +122,7 @@ class IntegratedDiffusionPipeline:
 
             print(f"✅ Grafo integrado #{graph_idx} guardado correctamente en: {file_path}")
 
-    def generate_global_graph_all_pinned(self, num_machines, num_buffers, num_assemblies, num_disassemblies):
+    def generate_global_graph_all_pinned(self, num_machines, num_buffers, num_assemblies, num_disassemblies): #2 8 2 2
         total_nodes = num_machines + num_buffers + num_assemblies + num_disassemblies
         node_types_list = ([MACHINE] * num_machines +
                         [BUFFER] * num_buffers +
@@ -321,8 +321,8 @@ class IntegratedDiffusionPipeline:
             out_p = [i for i in places if A[i].sum() == 0] or [places[-1]]
             in_t  = [j for j in trans if A[:, j].sum() == 0] or ([trans[0]] if trans else [])
 
-            out_places[n_id] = [loc2glob[i] for i in out_p]
-            in_trans[n_id]  = [loc2glob[j] for j in in_t]
+            out_places[n_id] = [loc2glob[i] for i in out_p] #places without output
+            in_trans[n_id]  = [loc2glob[j] for j in in_t]   #transitions without input
             trans_src[n_id] = [loc2glob[j] for j in trans]
 
         # ------------------------------------------------------------------
@@ -330,7 +330,16 @@ class IntegratedDiffusionPipeline:
         # ------------------------------------------------------------------
         rows, cols = torch.where(g_adj)
         for src, dst in zip(rows.tolist(), cols.tolist()):
-            # --- SRC es BUFFER ------------------------------------------------
+            # --- Ambos nodos normales ----------------------------------------
+            # for every place without output and every transition without input, connect them
+            for p in out_places[src]:
+                for t in in_trans[dst]:
+                    edges.append((p, t))
+
+            # --- SRC es BUFFER ------------------------------------------------ place connect to every transition
+            # without input of the dst subgraph
+            # !!!! here is a problem, after connecting the 'in_trans', maybe this in_trans element should be removed
+            # from the in_trans list, otherwise, it will be used to connect again later.
             if src in buffer_place:
                 p_buf = buffer_place[src]
                 for t in in_trans.get(dst, []):
@@ -338,6 +347,7 @@ class IntegratedDiffusionPipeline:
                 continue
 
             # --- DST es BUFFER ------------------------------------------------
+            # the transition node in the src subgraph with least output connect to this buffer
             if dst in buffer_place:
                 p_buf = buffer_place[dst]
                 # elige la transición saliente de src con menor grado saliente
@@ -347,10 +357,7 @@ class IntegratedDiffusionPipeline:
                     edges.append((best_t, p_buf))     # transition → place
                 continue
 
-            # --- Ambos nodos normales ----------------------------------------
-            for p in out_places[src]:
-                for t in in_trans[dst]:
-                    edges.append((p, t))
+
 
         # ------------------------------------------------------------------
         # 3) construir Data

@@ -7,6 +7,7 @@ from torch_geometric.nn import TransformerConv
 from torch_geometric.utils import to_dense_batch, to_dense_adj, subgraph
 from torch_geometric.data import Data, DataLoader, Batch
 import os
+import networkx as nx
 
 
 
@@ -81,6 +82,65 @@ def strict_projector_petri(node_labels, candidate_edge_matrix, device):
             projected[j, i] = 0
     return projected
 
+
+
+def strict_validation_petri(node_labels, candidate_edge_matrix, device):
+    """
+    Ensure at least one Transition has no input, and fix isolated nodes.
+    Prevent isolated nodes from connecting to the marked Transition.
+    """
+    n = node_labels.size(0)
+    projected = candidate_edge_matrix.clone()
+    transitions = torch.where(node_labels == 1)[0]
+    in_degrees = projected[:, transitions].sum(0)
+    min_input_idx = transitions[torch.argmin(in_degrees)]
+    projected[:, min_input_idx] = 0
+    marked_transition = min_input_idx.item()
+
+    for i in range(n):
+        if projected[i, :].sum() == 0 and projected[:, i].sum() == 0:
+            node_type = node_labels[i].item()
+            other_type = 1 - node_type
+
+            other_indices = torch.where(node_labels == other_type)[0]
+            if node_type == 0:
+                other_indices = other_indices[other_indices != marked_transition]
+            else:  # Transition -> Place
+                pass  # no restriction needed for Places
+
+            if len(other_indices) > 0:
+                degrees = projected[other_indices, :].sum(1) + projected[:, other_indices].sum(0)
+                min_deg_idx = other_indices[torch.argmin(degrees)]
+                projected[i, min_deg_idx] = 1
+
+    G = nx.from_numpy_array(projected.cpu().numpy(), create_using=nx.DiGraph)
+    components = list(nx.weakly_connected_components(G))
+
+    while len(components) > 1:
+        comp1 = components[0]
+        comp2 = components[1]
+
+        # Pick one node from comp1 and one from comp2 (with different types)
+        u_candidates = list(comp1)
+        v_candidates = list(comp2)
+
+        # Ensure Place -> Transition or Transition -> Place
+        edge_added = False
+        for u in u_candidates:
+            for v in v_candidates:
+                if node_labels[u] != node_labels[v]:
+                    if v == marked_transition:
+                        projected[v, u] = 1
+                    else:
+                        projected[u, v] = 1
+                    edge_added = True
+                    break
+            if edge_added:
+                break
+        G = nx.from_numpy_array(projected.cpu().numpy(), create_using=nx.DiGraph)
+        components = list(nx.weakly_connected_components(G))
+
+    return projected
 
 
 def get_sinusoidal_embedding(t, embedding_dim):
@@ -252,6 +312,8 @@ class LightweightPetriDiffusion(nn.Module):
 
                 if self.use_projector:
                     projected_edges = strict_projector_petri(current_node_labels, candidate_edge_matrix, device)
+                    if t == 0:
+                        projected_edges = strict_validation_petri(current_node_labels, projected_edges, device)
                 else:
                     projected_edges = candidate_edge_matrix
                 

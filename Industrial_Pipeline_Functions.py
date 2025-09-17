@@ -173,7 +173,7 @@ def validate_constraints(edge_matrix, node_labels, device, exact=True):
     return True
 
     
-def strict_projector_industrial(node_labels, candidate_edge_matrix, device):
+def strict_projector_industrial(node_labels, candidate_edge_matrix, device, add_additional_edges=True):
     """
     Project a sampled binary candidate adjacency matrix into one that satisfies:
 
@@ -258,67 +258,73 @@ def strict_projector_industrial(node_labels, candidate_edge_matrix, device):
     # Completion pass for exactness (still only using candidate=1 edges, and no bidirectionals).
     # If there are not enough candidate 1s available, the validator with exact=True should reject later.
     # ---------------------------------------------------------------------------------
-    B_idx = isB.nonzero(as_tuple=True)[0]
-
-    # --- ASSEMBLY: complete inputs (B->A) to exactly 2 ---
-    for j in isA.nonzero(as_tuple=True)[0].tolist():
-        need = 2 - projected_edges[B_idx, j].sum().item()
-        if need > 0:
-            cands = [b for b in B_idx.tolist()
-                     if cand[b, j] == 1 and projected_edges[b, j] == 0
-                     and projected_edges[j, b] == 0]  # avoid bidirectional
-            for b in cands[:int(need)]:
-                projected_edges[b, j] = 1
-
-    # --- ASSEMBLY: complete outputs (A->B) to exactly 1 ---
-    for i in isA.nonzero(as_tuple=True)[0].tolist():
-        need = 1 - projected_edges[i, B_idx].sum().item()
-        if need > 0:
-            cands = [b for b in B_idx.tolist()
-                     if cand[i, b] == 1 and projected_edges[i, b] == 0
-                     and projected_edges[b, i] == 0]
-            for b in cands[:int(need)]:
-                projected_edges[i, b] = 1
-
-    # --- DISASSEMBLY: complete input (B->D) to exactly 1 ---
-    for j in isD.nonzero(as_tuple=True)[0].tolist():
-        need = 1 - projected_edges[B_idx, j].sum().item()
-        if need > 0:
-            cands = [b for b in B_idx.tolist()
-                     if cand[b, j] == 1 and projected_edges[b, j] == 0
-                     and projected_edges[j, b] == 0]
-            for b in cands[:int(need)]:
-                projected_edges[b, j] = 1
-
-    # --- DISASSEMBLY: complete outputs (D->B) to exactly 2 ---
-    for i in isD.nonzero(as_tuple=True)[0].tolist():
-        need = 2 - projected_edges[i, B_idx].sum().item()
-        if need > 0:
-            cands = [b for b in B_idx.tolist()
-                     if cand[i, b] == 1 and projected_edges[i, b] == 0
-                     and projected_edges[b, i] == 0]
-            for b in cands[:int(need)]:
-                projected_edges[i, b] = 1
-
-    # --- MACHINE: complete outputs (M->B) to exactly 1 ---
-    for i in isM.nonzero(as_tuple=True)[0].tolist():
-        need = 1 - projected_edges[i, B_idx].sum().item()
-        if need > 0:
-            cands = [b for b in B_idx.tolist()
-                     if cand[i, b] == 1 and projected_edges[i, b] == 0
-                     and projected_edges[b, i] == 0]
-            for b in cands[:int(need)]:
-                projected_edges[i, b] = 1
-
-    # --- MACHINE: complete inputs (B->M) to exactly 1 ---
-    for j in isM.nonzero(as_tuple=True)[0].tolist():
-        need = 1 - projected_edges[B_idx, j].sum().item()
-        if need > 0:
-            cands = [b for b in B_idx.tolist()
-                     if cand[b, j] == 1 and projected_edges[b, j] == 0
-                     and projected_edges[j, b] == 0]
-            for b in cands[:int(need)]:
-                projected_edges[b, j] = 1
+    # B_idx = isB.nonzero(as_tuple=True)[0]
+    #
+    # # --- ASSEMBLY: complete inputs (B->A) to exactly 2 ---
+    # for j in isA.nonzero(as_tuple=True)[0].tolist():
+    #     need = 2 - projected_edges[B_idx, j].sum().item()
+    #     if need > 0:
+    #         cands = [b for b in B_idx.tolist()
+    #                  if cand[b, j] == 1 and projected_edges[b, j] == 0
+    #                  and projected_edges[j, b] == 0]  # avoid bidirectional
+    #         for b in cands[:int(need)]:
+    #             projected_edges[b, j] = 1
+    #             print('add_additional assembly edges B>A')
+    #
+    # # --- ASSEMBLY: complete outputs (A->B) to exactly 1 ---
+    # for i in isA.nonzero(as_tuple=True)[0].tolist():
+    #     need = 1 - projected_edges[i, B_idx].sum().item()
+    #     if need > 0:
+    #         cands = [b for b in B_idx.tolist()
+    #                  if cand[i, b] == 1 and projected_edges[i, b] == 0
+    #                  and projected_edges[b, i] == 0]
+    #         for b in cands[:int(need)]:
+    #             projected_edges[i, b] = 1
+    #             print('add_additional assembly edges A>B')
+    #
+    # # --- DISASSEMBLY: complete input (B->D) to exactly 1 ---
+    # for j in isD.nonzero(as_tuple=True)[0].tolist():
+    #     need = 1 - projected_edges[B_idx, j].sum().item()
+    #     if need > 0:
+    #         cands = [b for b in B_idx.tolist()
+    #                  if cand[b, j] == 1 and projected_edges[b, j] == 0
+    #                  and projected_edges[j, b] == 0]
+    #         for b in cands[:int(need)]:
+    #             projected_edges[b, j] = 1
+    #             print('add_additional DISASSEMBLY edges B>D')
+    #
+    # # --- DISASSEMBLY: complete outputs (D->B) to exactly 2 ---
+    # for i in isD.nonzero(as_tuple=True)[0].tolist():
+    #     need = 2 - projected_edges[i, B_idx].sum().item()
+    #     if need > 0:
+    #         cands = [b for b in B_idx.tolist()
+    #                  if cand[i, b] == 1 and projected_edges[i, b] == 0
+    #                  and projected_edges[b, i] == 0]
+    #         for b in cands[:int(need)]:
+    #             projected_edges[i, b] = 1
+    #             print('add_additional DISASSEMBLY edges D>B')
+    #
+    # # --- MACHINE: complete outputs (M->B) to exactly 1 ---
+    # for i in isM.nonzero(as_tuple=True)[0].tolist():
+    #     need = 1 - projected_edges[i, B_idx].sum().item()
+    #     if need > 0:
+    #         cands = [b for b in B_idx.tolist()
+    #                  if cand[i, b] == 1 and projected_edges[i, b] == 0
+    #                  and projected_edges[b, i] == 0]
+    #         for b in cands[:int(need)]:
+    #             projected_edges[i, b] = 1
+    #             print('add_additional MACHINE edges M>B')
+    #
+    # # --- MACHINE: complete inputs (B->M) to exactly 1 ---
+    # for j in isM.nonzero(as_tuple=True)[0].tolist():
+    #     need = 1 - projected_edges[B_idx, j].sum().item()
+    #     if need > 0:
+    #         cands = [b for b in B_idx.tolist()
+    #                  if cand[b, j] == 1 and projected_edges[b, j] == 0
+    #                  and projected_edges[j, b] == 0]
+    #         for b in cands[:int(need)]:
+    #             projected_edges[b, j] = 1
+    #             print('add_additional MACHINE edges B>M')
 
     return projected_edges
 
@@ -510,23 +516,32 @@ class LightweightIndustrialDiffusion(nn.Module):
                 current_node_labels = x.argmax(dim=1)
 
                 found = False
-                for attempt in range(max_attempts):
+                if t in (1, 0):
+                    for attempt in range(max_attempts):
+                        sampled_flat = torch.multinomial(flat_probs, num_samples=1).view(-1)
+                        candidate_edge_matrix = sampled_flat.view(num_nodes, num_nodes)
+
+                        projected = strict_projector_industrial(current_node_labels, candidate_edge_matrix, device) \
+                                    if self.use_projector else candidate_edge_matrix
+                        if validate_constraints(projected, current_node_labels, device, exact=True):
+                            e = F.one_hot(projected.long(), num_classes=self.edge_num_classes).float()
+                            found = True
+                            break
+                        # e = F.one_hot(projected.long(), num_classes=self.edge_num_classes).float()
+                        # 💡 qui il pezzo che mi chiedevi dove mettere:
+                else:
                     sampled_flat = torch.multinomial(flat_probs, num_samples=1).view(-1)
                     candidate_edge_matrix = sampled_flat.view(num_nodes, num_nodes)
 
                     projected = strict_projector_industrial(current_node_labels, candidate_edge_matrix, device) \
-                                if self.use_projector else candidate_edge_matrix
+                        if self.use_projector else candidate_edge_matrix
+                    e = F.one_hot(projected.long(), num_classes=self.edge_num_classes).float()
 
-                    # 💡 qui il pezzo che mi chiedevi dove mettere:
-                    if validate_constraints(projected, current_node_labels, device, exact=True):
-                        e = F.one_hot(projected.long(), num_classes=self.edge_num_classes).float()
-                        found = True
-                        break
-
-                if not found:
-                    
-                    pass
-
+            if save_intermediate:
+                if validate_constraints(projected, current_node_labels, device, exact=True):
+                    e = F.one_hot(projected.long(), num_classes=self.edge_num_classes).float()
+                    found = True
+                    break
 
 
             if save_intermediate:
@@ -600,23 +615,25 @@ class LightweightIndustrialDiffusion(nn.Module):
                 found = False
                 current_node_labels = x.argmax(dim=1)             # [N]
 
-                for _ in range(max_attempts):
+                # for _ in range(max_attempts):
                     # Sample a 0/1 candidate from probs
-                    candidate_edge_matrix = torch.multinomial(
-                        edge_probs.view(-1, self.edge_num_classes), 1
-                    ).view(num_nodes, num_nodes)                  # [N, N] in {0,1}
+                candidate_edge_matrix = torch.multinomial(
+                    edge_probs.view(-1, self.edge_num_classes), 1
+                ).view(num_nodes, num_nodes)                  # [N, N] in {0,1}
 
-                    # Project to enforce local "at most" constraints + no bidirectionals
-                    projected_edges = strict_projector_industrial(
-                        current_node_labels, candidate_edge_matrix, device
-                    ) if self.use_projector else candidate_edge_matrix
+                # Project to enforce local "at most" constraints + no bidirectionals
+                projected_edges = strict_projector_industrial(
+                    current_node_labels, candidate_edge_matrix, device
+                ) if self.use_projector else candidate_edge_matrix
 
-                    # IMPORTANT: use the strengthened validator with exact=True
-                    # (Make sure your validate_constraints signature supports exact=True)
-                    if validate_constraints(projected_edges, current_node_labels, device, exact=True):
-                        e = F.one_hot(projected_edges.long(), num_classes=self.edge_num_classes).float()
-                        found = True
-                        break
+                # IMPORTANT: use the strengthened validator with exact=True
+                # (Make sure your validate_constraints signature supports exact=True)
+
+            if save_intermediate:
+                if validate_constraints(projected_edges, current_node_labels, device, exact=True):
+                    e = F.one_hot(projected_edges.long(), num_classes=self.edge_num_classes).float()
+                    found = True
+                    break
 
                 # If not found, keep previous 'e' (do NOT fallback to an invalid matrix)
 

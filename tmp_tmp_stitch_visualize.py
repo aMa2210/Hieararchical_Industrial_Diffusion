@@ -34,6 +34,6 @@ def visualize_stitched(stitched: Data):
     plt.show()
 
 
-save_path = "stitched_graph.pt"
+save_path = "./stitched_graph22.pt"
 stitched = torch.load(save_path, map_location="cpu")
 visualize_stitched(stitched)

@@ -331,28 +331,33 @@ if __name__ == "__main__":
 ############### generate industrial graphs
     # torch.manual_seed(42); random.seed(42)
     # experiment_free(n_samples=10)       # E1
-    experiment_allpinned(n_samples=10, inv=(2,6,2,2))  # E2
+    # experiment_allpinned(n_samples=10, inv=(2,6,2,2))  # E2
     # experiment_partial(n_samples=10)    # E3
 
 ################ generate petrinet
     # from integrated_diffusion import IntegratedDiffusionPipeline
+    # from torch_geometric.data import Data
     #
     # pipeline = IntegratedDiffusionPipeline(plant_model, petri_models, device)
     #
-    # from torch_geometric.data import Data
-    # petri_nodes, petri_edges = pipeline.generate_petri_subgraph(node_type=0, n_nodes_petri=8)
+    # all_graphs = []
     #
-    # n_nodes = len(petri_nodes)
-    # edge_index = (petri_edges[0] != 0).nonzero(as_tuple=False).t().contiguous()  # shape [2, num_edges]
-    # x = torch.nn.functional.one_hot(petri_nodes, num_classes=2).float()  # shape [n_nodes, 2]
-    # graph_data = Data(x=x, edge_index=edge_index)
+    # for i in range(10):
+    #     petri_nodes, petri_edges = pipeline.generate_petri_subgraph(node_type=0, n_nodes_petri=8)
     #
-    # torch.save([graph_data], 'petri_net.pt')
+    #     n_nodes = len(petri_nodes)
+    #     edge_index = (petri_edges[0] != 0).nonzero(as_tuple=False).t().contiguous()  # shape [2, num_edges]
+    #     x = torch.nn.functional.one_hot(petri_nodes, num_classes=2).float()  # shape [n_nodes, 2]
+    #     graph_data = Data(x=x, edge_index=edge_index)
+    #
+    #     all_graphs.append(graph_data)
+    #
+    # torch.save(all_graphs, 'petri_net_917_10.pt')
 
 
 
 ################ generate integrated graph
-    # integ = pipeline.generate_full_integrated_graph(n_nodes_global=15, n_nodes_petri=8)
-    # torch.save(integ, "graphs_data_tmp.pt")
+    integ = pipeline.generate_full_integrated_graph(n_nodes_global=10, n_nodes_petri=6)
+    torch.save(integ, "graphs_data_tmp.pt")
     #
-    # pipeline.stitch("graphs_data_tmp.pt", save_path="./stitched_graph.pt")
+    pipeline.stitch("graphs_data_tmp.pt", save_path="./stitched_graph22.pt")

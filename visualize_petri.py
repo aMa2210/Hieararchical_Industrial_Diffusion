@@ -8,7 +8,7 @@ import os
 
 # Load generated graphs from final_graphs.pt
 # graphs = torch.load('generated_graphs/final_graphs.pt')
-graphs = torch.load('petri_net.pt')
+graphs = torch.load('petri_net_917_10.pt')
 
 print(type(graphs))
 
@@ -66,8 +66,8 @@ for idx, graph_data in enumerate(graphs):
     plt.axis('off')
 
     image_path = os.path.join(output_image_dir, f'petri_net_{idx + 1}.png')
-    # plt.savefig(image_path, bbox_inches='tight')
-    plt.show()
+    plt.savefig(image_path, bbox_inches='tight')
+    # plt.show()
     plt.close()
 
 print(f'Successfully saved {len(graphs)} Petri net images to "{output_image_dir}".')

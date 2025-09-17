@@ -39,12 +39,35 @@ class IntegratedDiffusionPipeline:
     def generate_full_integrated_graph(self, n_nodes_global, n_nodes_petri=10, output_dir='integrated_graph'):
         os.makedirs(output_dir, exist_ok=True)
 
-        # global_node_types, global_edges = self.generate_global_graph(n_nodes_global) ## generate again
-        global_node_types, global_edges = self.generate_global_graph_all_pinned(2,8,2,2) ## generate again
+        global_node_types, global_edges = self.generate_global_graph(n_nodes_global) ## generate again
+        # global_node_types, global_edges = self.generate_global_graph_all_pinned(3,4,2,1) ## generate again
 
         # Convertir edges globales a matriz de adyacencia claramente
         global_adj_matrix = global_edges.squeeze(0).cpu().numpy()
-
+        ########################
+        global_graph_to_save = [({"nodes": global_node_types,
+                                "edges": global_adj_matrix})]
+        adj_list, node_list = [], []
+        import numpy as np
+        for g in global_graph_to_save:
+            #  (n,n) matriz de adyacencia → numpy uint8
+            adj_list.append(g["edges"].astype(np.uint8))
+            #  vector de etiquetas de nodo → numpy int8
+            node_list.append(g["nodes"].cpu().numpy().astype(np.int8))
+        LABEL2ID = {"MACHINE": 3,
+                    "BUFFER": 1,
+                    "ASSEMBLY": 0,
+                    "DISASSEMBLY": 2}
+        payload = {
+            "adjacency_matrices": adj_list,
+            "node_types": node_list,
+            "label2id": LABEL2ID
+        }
+        import datetime as dt
+        stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        fname = f'industrial_graph_for_stitch/{stamp}.pt'
+        torch.save(payload, fname)
+        ########################
         integrated_graph = {
             "global_graph": {
                 "node_types": global_node_types.cpu().numpy(),

@@ -330,9 +330,9 @@ if __name__ == "__main__":
 
 ############### generate industrial graphs
     # torch.manual_seed(42); random.seed(42)
-    # experiment_free(n_samples=10)       # E1
-    # experiment_allpinned(n_samples=10, inv=(2,6,2,2))  # E2
-    # experiment_partial(n_samples=10)    # E3
+    experiment_free(n_samples=10)       # E1
+    experiment_allpinned(n_samples=10, inv=(2,6,2,2))  # E2
+    experiment_partial(n_samples=10)    # E3
 
 ################ generate petrinet
     # from integrated_diffusion import IntegratedDiffusionPipeline

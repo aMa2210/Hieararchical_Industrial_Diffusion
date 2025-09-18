@@ -8,7 +8,7 @@ import os
 
 # Load generated graphs from final_graphs.pt
 # graphs = torch.load('generated_graphs/final_graphs.pt')
-graphs = torch.load('petri_net_917_10.pt')
+graphs = torch.load('integrated_graph/petri_subgraphs.pt')
 
 print(type(graphs))
 

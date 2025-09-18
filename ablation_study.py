@@ -48,7 +48,7 @@ NODE_M, EDGE_M = compute_marginal_probs(DATASET, DEVICE)
 
 EPOCHS = 30         # ↓ Ajusta para tu GPU
 T_STEPS = 100
-N_SAMP  = 300        # muestras para métrica
+N_SAMP  = 300        # samples for metric
 
 
 from torch_geometric.data import Batch
@@ -72,19 +72,19 @@ MU_T, COV_T = _Z_TRAIN.mean(0), torch.from_numpy(np.cov(_Z_TRAIN.T.numpy()))
 
 # ---------- 2. Lista de variantes ----------
 ABLATIONS = [
-    # modelo completo (24 dim)
+    # full model (24 dim)
     {"name": "baseline",
      "hidden_dim": 12, "kl": 0.1, "constraint": 1.0, "use_projector": True},
 
-    # mismo tamaño pero sin projector
+    # same size but without projector
     {"name": "no_projector",
      "hidden_dim": 12, "kl": 0.1, "constraint": 0.0, "use_projector": False},
 
-    # red más pequeña: 32 → ½ de 64
+    # smaller network: 32 → ½ of 64
     {"name": "half_hidden",
      "hidden_dim": 6, "kl": 0.1, "constraint": 1.0, "use_projector": True},
 
-    # pesos aleatorios + projector
+    # random weights + projector
     {"name": "random_projector",
      "hidden_dim": 12, "kl": 0.0, "constraint": 0.0,
      "use_projector": True, "skip_training": True},
@@ -111,7 +111,7 @@ def compute_metrics(model, out_dir, n_samples=N_SAMP):
                                      if i != j], dtype=torch.long).t().contiguous().to(DEVICE)
             data = Data(x=torch.zeros(n, model.node_num_classes, device=DEVICE),
                         edge_index=edge_idx)
-            data.batch = torch.zeros(n, dtype=torch.long, device=DEVICE)
+            data.batch = torch.zeros(n, dtype=torch.long, device=DEVICE)    #batch is used to define the affiliation of the nodes, here, all the nodes are in one graph
             nodes, edges, _ = model.reverse_diffusion_single(
                 data, DEVICE, save_intermediate=False)
             samples.append((nodes.cpu(), edges.squeeze(0).cpu()))
@@ -164,6 +164,13 @@ def train_loop(model, loader, device,
             opt.step()
             tot += loss.item()
         print(f"Epoch {ep+1}/{epochs}, Loss: {tot/len(loader):.4f}")
+
+model = LightweightIndustrialDiffusion().to(device).eval()
+model.load_state_dict(torch.load("industrial_model.pth",
+                                       map_location=device))
+out_dir = 'tmp_metric'
+metrics = compute_metrics(model, out_dir)
+
 
 for cfg in ABLATIONS:
     run_name = f"{cfg['name']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"

@@ -76,6 +76,8 @@ class IntegratedDiffusionPipeline:
             "petri_subgraphs": {}
         }
 
+        petri_graphs = []
+
         for idx, node_type in enumerate(global_node_types):
             if node_type.item() != BUFFER:
                 petri_nodes, petri_edges = self.generate_petri_subgraph(node_type.item(), n_nodes_petri)
@@ -87,6 +89,12 @@ class IntegratedDiffusionPipeline:
                     "node_types": petri_node_types,
                     "adjacency_matrix": petri_adj_matrix
                 }
+
+                edge_index = (petri_edges[0] != 0).nonzero(as_tuple=False).t().contiguous()
+                x = torch.nn.functional.one_hot(petri_nodes, num_classes=2).float()
+                graph_data = Data(x=x, edge_index=edge_index)
+                petri_graphs.append(graph_data)
+
             else:                               # BUFFER  →  subgrafo trivial
                     integrated_graph["petri_subgraphs"][idx] = {
                         "node_types":  [-1],    # un solo place
@@ -98,6 +106,8 @@ class IntegratedDiffusionPipeline:
         # Guardar el grafo integrado de forma ordenada
         file_path = os.path.join(output_dir, 'integrated_graph.pt')
         torch.save(integrated_graph, file_path)
+        petri_file = os.path.join(output_dir, 'petri_subgraphs.pt')
+        torch.save(petri_graphs, petri_file)
 
         print(f"✅ Grafo integrado guardado correctamente en: {file_path}")
 

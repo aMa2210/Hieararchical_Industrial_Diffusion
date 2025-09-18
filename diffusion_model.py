@@ -29,6 +29,7 @@ def get_forbidden_mask(node_labels, device):
     diag_mask = torch.eye(n, dtype=torch.bool, device=device)
     allowed_mask = (node_labels.unsqueeze(1) != node_labels.unsqueeze(0))
     forbidden_mask = diag_mask | (~allowed_mask)
+    # !!tbd add punishment about isolated nodes
     return forbidden_mask.float()  # float mask: 1.0 for forbidden, 0.0 for allowed
 
 
@@ -420,9 +421,9 @@ def compute_batch_loss(model, batch_data, T, device, edge_weight, node_marginal,
         t_i = torch.randint(0, T, (1,)).item()
         x_t, e_t = model.forward_diffusion(x0, e0, t_i, device)
 
-        edge_index_noisy = (e_t.argmax(dim=-1) > 0).nonzero(as_tuple=False).t().contiguous()
+        edge_index_noisy = (e_t.argmax(dim=-1) > 0).nonzero(as_tuple=False).t().contiguous() # format the e_t so that it matches the input style of Data
         data_i = Data(x=x_t, edge_index=edge_index_noisy)
-        data_i.batch = torch.zeros(x_t.size(0), dtype=torch.long, device=device)
+        data_i.batch = torch.zeros(x_t.size(0), dtype=torch.long, device=device) # the tensor to indicate the belongings of the edges, since here all the nodes are in the same graph(i.e. graph[0]), the value of the tensor is all 0
         node_logits, edge_logits_list = model(data_i.x, data_i.edge_index, data_i.batch, t=t_i)
         
         # Node loss.
@@ -433,7 +434,9 @@ def compute_batch_loss(model, batch_data, T, device, edge_weight, node_marginal,
             edge_logits = edge_logits_list[0]  # shape: (true_n, true_n, edge_num_classes)
             loss_edge = F.cross_entropy(edge_logits.view(-1, model.edge_num_classes),
                                         e0.to(device).view(-1),
-                                        weight=edge_weight)
+                                        weight=edge_weight) #the rarer the kind of edge is (exist or not), the more loss is imposed
+                                                            #in this case, since for most of the nodes, edge doesn't exist between them,
+                                                            #if the model doesn't generate the edge that was originally exist, it gets much loss.
         else:
             loss_edge = 0.0
 
@@ -454,6 +457,10 @@ def compute_batch_loss(model, batch_data, T, device, edge_weight, node_marginal,
             edge_probs = F.softmax(edge_logits, dim=-1)  # shape: (true_n, true_n, edge_num_classes)
             pred_edge_prob = edge_probs[..., 1]  # probability for class 1
             # Compute forbidden mask from ground-truth node labels.
+            # tbd
+            # !!!here, there may exists a problem, the code use x0 to get the forbidden_mask instead of the graph the one it just generated
+            # !!!but if t is a large number, the noise is heavy, the generated graph is not much as similar as the ground truth, in this case
+            # !!!using the constraint of the ground truth graph is inappropriate
             forbidden_mask = get_forbidden_mask(x0, device)  # shape: (true_n, true_n)
             forbidden_mask = forbidden_mask[:true_n, :true_n]
             # Use MSE loss to push predicted probability to 0 where forbidden.
@@ -476,7 +483,7 @@ def compute_batch_loss(model, batch_data, T, device, edge_weight, node_marginal,
 
 
 def train_model(model, dataloader, optimizer, device, edge_weight, node_marginal, edge_marginal, epochs=20, T=100):
-        model.train()
+        model.train()   # switch model to train mode, not the train function itself
         for epoch in range(epochs):
             total_loss = 0.0
             for batch in dataloader:
@@ -518,8 +525,9 @@ def compute_marginal_probs(dataset, device):
         # For edges: compute dense adjacency and binarize.
         dense_adj = to_dense_adj(data.edge_index, max_num_nodes=true_n)[0]  # (true_n, true_n)
         e0 = (dense_adj > 0).long()
-        total_edges += e0.numel()
         edge_counts += torch.bincount(e0.view(-1), minlength=2).float().to(device)
+        total_edges += e0.numel()
+
     
     # Avoid division by zero.
     if total_nodes > 0:

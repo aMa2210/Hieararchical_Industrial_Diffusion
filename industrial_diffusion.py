@@ -363,13 +363,11 @@ class LightweightIndustrialDiffusion(nn.Module):
 
     def reverse_diffusion_single_counts(self, data, pinned_mask, device, save_intermediate=True):
         """
-        Parecido a reverse_diffusion_single, pero SÓLO re-muestrea aquellos nodos
-        que NO están fijados (pinned_mask[i] = False).
-        'pinned_mask' es un tensor booleano de tamaño [num_nodes].
-        
-        Ejemplo:
-        pinned_mask = [True, True, False, ...] => se respeta el tipo de los nodos 0 y 1,
-        y se re-samplea el resto.
+        Similar to reverse_diffusion_single, but it ONLY re-samples those nodes that are NOT fixed (pinned_mask[i] = False).
+        pinned_mask is a boolean tensor of size [num_nodes].
+
+        Example:
+        pinned_mask = [True, True, False, ...] ⇒ the types of nodes 0 and 1 are preserved, and the rest are re-sampled.
         """
         import torch
         import torch.nn.functional as F

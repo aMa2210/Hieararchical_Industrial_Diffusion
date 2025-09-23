@@ -1,0 +1,16 @@
+{
+  "validity": 1.0,
+  "uniqueness": 0.8266666666666667,
+  "novelty": 1.0,
+  "fid": -0.08046660093057077,
+  "mmd": 0.5514540076255798,
+  "run_dir": "ablation_runs_new\\baseline",
+  "model_id": "baseline",
+  "weights_path": "ablation_runs_new\\baseline\\model.pth",
+  "did_train": 0,
+  "name": "baseline",
+  "hidden_dim": 12,
+  "kl": 0.1,
+  "constraint": 1.0,
+  "use_projector": true
+}

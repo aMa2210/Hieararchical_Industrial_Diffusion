@@ -1,0 +1,16 @@
+{
+  "validity": 0.0,
+  "uniqueness": 1.0,
+  "novelty": 1.0,
+  "fid": 5.898511179303841,
+  "mmd": 1.3348989486694336,
+  "run_dir": "ablation_runs_new\\no_projector",
+  "model_id": "no_projector",
+  "weights_path": "ablation_runs_new\\no_projector\\model.pth",
+  "did_train": 0,
+  "name": "no_projector",
+  "hidden_dim": 12,
+  "kl": 0.1,
+  "constraint": 0.0,
+  "use_projector": false
+}

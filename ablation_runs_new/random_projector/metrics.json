@@ -1,0 +1,17 @@
+{
+  "validity": 0.38,
+  "uniqueness": 1.0,
+  "novelty": 1.0,
+  "fid": 0.20514019513823856,
+  "mmd": 0.6231187582015991,
+  "run_dir": "ablation_runs_new\\random_projector",
+  "model_id": "random_projector",
+  "weights_path": "ablation_runs_new\\random_projector\\model.pth",
+  "did_train": 0,
+  "name": "random_projector",
+  "hidden_dim": 12,
+  "kl": 0.0,
+  "constraint": 0.0,
+  "use_projector": true,
+  "skip_training": true
+}

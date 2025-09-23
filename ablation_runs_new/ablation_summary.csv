@@ -1,0 +1,5 @@
+timestamp,model_id,run_dir,weights_path,did_train,name,hidden_dim,kl,constraint,use_projector,validity,uniqueness,novelty,fid,mmd,skip_training
+2025-09-23 14:38:53,baseline,ablation_runs_new\baseline,ablation_runs_new\baseline\model.pth,0,baseline,12,0.1,1.0,True,0.9833333333333333,0.7,1.0,0.019208236969713396,0.6738683581352234,
+2025-09-23 14:38:53,no_projector,ablation_runs_new\no_projector,ablation_runs_new\no_projector\model.pth,0,no_projector,12,0.1,0.0,False,0.0,1.0,1.0,6.160115739130466,1.3562641143798828,
+2025-09-23 14:38:53,half_hidden,ablation_runs_new\half_hidden,ablation_runs_new\half_hidden\model.pth,0,half_hidden,6,0.1,1.0,True,0.42333333333333334,0.99,1.0,0.09323553550681252,0.85846346616745,
+2025-09-23 14:38:53,random_projector,ablation_runs_new\random_projector,ablation_runs_new\random_projector\model.pth,0,random_projector,12,0.0,0.0,True,0.38,1.0,1.0,0.20514019513823856,0.6231187582015991,True

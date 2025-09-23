@@ -31,8 +31,11 @@ def validate_constraints(edge_matrix, node_labels, device):
     - No bidireccionales.
     """
     forbidden = get_forbidden_mask(node_labels, device)
+    # print("edge_matrix device:", edge_matrix.device)
+    # print("forbidden device:", forbidden.device)
+
     # 1) Ninguna arista donde forbidden==1
-    if (edge_matrix * forbidden).any():
+    if (edge_matrix * forbidden).any():# RuntimeError: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu!
         return False
     # 2) Máximos por tipo (ejemplo MACHINE→BUFFER <=1)
     n = node_labels.size(0)

@@ -1,0 +1,16 @@
+{
+  "validity": 0.42333333333333334,
+  "uniqueness": 0.99,
+  "novelty": 1.0,
+  "fid": 0.19168185033554735,
+  "mmd": 0.9188663959503174,
+  "run_dir": "ablation_runs_new\\half_hidden",
+  "model_id": "half_hidden",
+  "weights_path": "ablation_runs_new\\half_hidden\\model.pth",
+  "did_train": 0,
+  "name": "half_hidden",
+  "hidden_dim": 6,
+  "kl": 0.1,
+  "constraint": 1.0,
+  "use_projector": true
+}

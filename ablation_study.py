@@ -46,7 +46,7 @@ LOADER  = DataLoader(DATASET, batch_size=4, shuffle=True)
 EDGE_W  = compute_edge_weights(DATASET, DEVICE)
 NODE_M, EDGE_M = compute_marginal_probs(DATASET, DEVICE)
 
-EPOCHS = 30         # ↓ Ajusta para tu GPU
+EPOCHS = 1         # ↓ Ajusta para tu GPU
 T_STEPS = 100
 N_SAMP  = 300        # samples for metric
 
@@ -57,6 +57,7 @@ import numpy as np
 
 device = DEVICE  # reutilizamos la misma GPU
 
+# !!!tbd the following encoder is not trained
 ENC = GraphEncoder(in_dim=4).to(device).eval()
 
 def _embed_dataset(dataset):
@@ -67,7 +68,7 @@ def _embed_dataset(dataset):
         objs.append({"nodes": x_lbl, "edges": dense})
     return encode_graphs(objs, ENC, device)
 
-_Z_TRAIN = _embed_dataset(DATASET)   # se guarda en RAM
+_Z_TRAIN = _embed_dataset(DATASET)   # it is stored in RAM
 MU_T, COV_T = _Z_TRAIN.mean(0), torch.from_numpy(np.cov(_Z_TRAIN.T.numpy()))
 
 # ---------- 2. Lista de variantes ----------
@@ -104,6 +105,7 @@ def wl_hash(nodes, edges):
 def compute_metrics(model, out_dir, n_samples=N_SAMP):
     model.eval()
     samples, hashes = [], []
+    # n_samples = 300
     with torch.no_grad():
         for _ in range(n_samples):
             n = 15
@@ -114,17 +116,18 @@ def compute_metrics(model, out_dir, n_samples=N_SAMP):
             data.batch = torch.zeros(n, dtype=torch.long, device=DEVICE)    #batch is used to define the affiliation of the nodes, here, all the nodes are in one graph
             nodes, edges, _ = model.reverse_diffusion_single(
                 data, DEVICE, save_intermediate=False)
-            samples.append((nodes.cpu(), edges.squeeze(0).cpu()))
-            hashes.append(wl_hash(nodes.cpu(), edges.squeeze(0).cpu()))  # ← uno por muestra
+            # samples.append((nodes.cpu(), edges.squeeze(0).cpu()))
+            samples.append((nodes.to(DEVICE), edges.squeeze(0).to(DEVICE)))
+            hashes.append(wl_hash(nodes.cpu(), edges.squeeze(0).cpu()))  # ← one per sample; calculate the hash to check the uniqueness of the samples later
 
     # validity
     viol = sum(not validate_constraints(e, n, DEVICE) for n, e in samples)
     validity = 1 - viol / n_samples
 
-    # uniqueness (WL)  – colisiones entre muestras
+    # uniqueness (WL)  – collisions between samples
     uniqueness = len(set(hashes)) / n_samples
 
-    # novelty (WL) – cada muestra vs dataset
+    # novelty (WL) – each sample vs dataset
     train_hashes = { wl_hash(d.x.argmax(1).cpu(),
                               to_dense_adj(d.edge_index,
                                            max_num_nodes=d.x.size(0))[0].cpu())
@@ -138,7 +141,7 @@ def compute_metrics(model, out_dir, n_samples=N_SAMP):
     fid = frechet(MU_T, COV_T, mu_s, cov_s).item()
     mmd = mmd_rbf(_Z_TRAIN, Z_samp).item()
 
-    torch.save(samples, out_dir/"samples.pt")
+    torch.save(samples, os.path.join(out_dir, "samples.pt"))
     return {"validity": validity, "uniqueness": uniqueness,
             "novelty": novelty, "fid": fid, "mmd": mmd}
 
@@ -168,14 +171,16 @@ def train_loop(model, loader, device,
 model = LightweightIndustrialDiffusion().to(device).eval()
 model.load_state_dict(torch.load("industrial_model.pth",
                                        map_location=device))
-out_dir = 'tmp_metric'
-metrics = compute_metrics(model, out_dir)
+# out_dir = 'tmp_metric'
+#
+# metrics = compute_metrics(model, out_dir)
 
 
 for cfg in ABLATIONS:
     run_name = f"{cfg['name']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     out_dir  = ROOT_OUT/run_name
-    out_dir.mkdir()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    # out_dir.mkdir()
 
     print(f"▶️  Entrenando {run_name}")
     hidden = cfg.get("hidden_dim", 12)

@@ -101,7 +101,10 @@ for A, types in zip(train["adjacency_matrices"], train["node_types"]):
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 plant_model = LightweightIndustrialDiffusion().to(device).eval()
-plant_model.load_state_dict(torch.load("industrial_model.pth",
+# plant_model.load_state_dict(torch.load("industrial_model.pth",
+#                                        map_location=device))
+
+plant_model.load_state_dict(torch.load("ablation_runs_new/baseline/model.pth",
                                        map_location=device))
 
 petri_models = {
@@ -252,7 +255,7 @@ class GraphEncoder(torch.nn.Module):
 
 @torch.no_grad()
 def encode_graphs(list_dicts, encoder, device='cpu', bs=64):
-    """Convierte tu lista de dicts {'nodes','edges'} en embeddings."""
+    """Convert your list of dicts {'nodes','edges'} into embeddings."""
     data_objs = []
     for g in list_dicts:
         x = torch.nn.functional.one_hot(g["nodes"], num_classes=4).float()
@@ -281,7 +284,7 @@ def cov_sqrt(mat, eps=1e-8):
 
 
 def mmd_rbf(X, Y):
-    # bandwidth heurístico (mediana)
+    # heuristic bandwidth (median)
     Z = torch.cat([X, Y], 0)
     sq = torch.cdist(Z, Z, p=2.0)**2
     sigma = torch.sqrt(0.5*sq[sq>0].median())
@@ -330,9 +333,9 @@ if __name__ == "__main__":
 
 ############### generate industrial graphs
     # torch.manual_seed(42); random.seed(42)
-    experiment_free(n_samples=10)       # E1
-    experiment_allpinned(n_samples=10, inv=(2,6,2,2))  # E2
-    experiment_partial(n_samples=10)    # E3
+    experiment_free(n_samples=300)       # E1
+    experiment_allpinned(n_samples=300, inv=(3,4,2,1))  # E2
+    experiment_partial(n_samples=300)    # E3
 
 ################ generate petrinet
     # from integrated_diffusion import IntegratedDiffusionPipeline
@@ -356,8 +359,8 @@ if __name__ == "__main__":
 
 
 
-################ generate integrated graph
-    integ = pipeline.generate_full_integrated_graph(n_nodes_global=10, n_nodes_petri=6)
-    torch.save(integ, "graphs_data_tmp.pt")
-    #
-    pipeline.stitch("graphs_data_tmp.pt", save_path="./stitched_graph22.pt")
+# ################ generate integrated graph
+#     integ = pipeline.generate_full_integrated_graph(n_nodes_global=10, n_nodes_petri=6)
+#     torch.save(integ, "graphs_data_tmp.pt")
+#     #
+#     pipeline.stitch("graphs_data_tmp.pt", save_path="./stitched_graph22.pt")

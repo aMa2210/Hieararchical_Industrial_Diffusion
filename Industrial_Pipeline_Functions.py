@@ -889,7 +889,7 @@ def experiment_free(n_samples=300, n_nodes=15):
     print(f"[E1-Free]   {n_samples} samples in {runtime:.1f}s")
     #print(evaluate(batch), "\n")
     #extra_metrics(batch, tag="[E1]")
-    file_name =_save_graphs_pt("E1", batch, save_dir="exp_outputs")
+    file_name =_save_graphs_pt("E1", batch, save_dir="exp_outputs/E1/pt_file")
     return file_name
 
 
@@ -919,7 +919,7 @@ def experiment_allpinned(n_samples=300,
     print(f"[E2-AllPinned] {n_samples} samples in {runtime:.1f}s")
     #print(evaluate(batch), "\n")
     #extra_metrics(batch, tag="[E2]")
-    file_name =_save_graphs_pt("E2", batch, save_dir="exp_outputs")
+    file_name =_save_graphs_pt("E2", batch, save_dir="exp_outputs/E2/pt_file")
     return file_name
 
 
@@ -943,7 +943,7 @@ def experiment_partial(n_samples=300, n_nodes=20, pin_ratio=0.3):
     print(f"[E3-Partial] {n_samples} samples in {runtime:.1f}s")
     #print(evaluate(batch), "\n")
     #extra_metrics(batch, tag="[E3]")
-    file_name =_save_graphs_pt("E3", batch, save_dir="exp_outputs")
+    file_name =_save_graphs_pt("E3", batch, save_dir="exp_outputs/E3/pt_file")
     return file_name
 
 

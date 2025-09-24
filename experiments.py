@@ -360,7 +360,7 @@ if __name__ == "__main__":
 
 
 # ################ generate integrated graph
-#     integ = pipeline.generate_full_integrated_graph(n_nodes_global=10, n_nodes_petri=6)
-#     torch.save(integ, "graphs_data_tmp.pt")
-#     #
-#     pipeline.stitch("graphs_data_tmp.pt", save_path="./stitched_graph22.pt")
+    integ = pipeline.generate_full_integrated_graph(n_nodes_global=10, n_nodes_petri=6)
+    torch.save(integ, "graphs_data_tmp.pt")
+    #
+    pipeline.stitch("graphs_data_tmp.pt", save_path="./stitched_graph22.pt")

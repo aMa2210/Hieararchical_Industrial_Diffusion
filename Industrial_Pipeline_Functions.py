@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.data import InMemoryDataset, Data
 import torch_geometric.utils as pyg_utils
-
+from tqdm import tqdm
 
 class IndustrialGraphDataset(InMemoryDataset):
     def __init__(self, root, transform=None, pre_transform=None):
@@ -555,98 +555,94 @@ class LightweightIndustrialDiffusion(nn.Module):
 
         return final_node_labels, final_edge_labels.unsqueeze(0), intermediate_graphs
 
-
     def reverse_diffusion_single_counts(self, data, pinned_mask, device, save_intermediate=True):
         """
-        Reverse diffusion with *partially pinned* node types.
-        Only nodes with pinned_mask[i] == False are (re)sampled; pinned nodes keep their type.
+        Similar to reverse_diffusion_single, but it ONLY re-samples those nodes that are NOT fixed (pinned_mask[i] = False).
+        pinned_mask is a boolean tensor of size [num_nodes].
 
-        Args:
-            data: torch_geometric.data.Data with:
-                - x: one-hot node types, shape [N, node_num_classes]
-                - edge_index: can be empty (no edges) or any scaffolding you want for message passing
-                - batch: tensor of zeros of length N (single-graph batch)
-            pinned_mask (BoolTensor): shape [N], True = keep node type fixed, False = resample
-            device: torch.device
-            save_intermediate (bool): if True, returns a list of intermediate graphs
-
-        Returns:
-            final_node_labels: LongTensor [N]          (argmax over x)
-            final_edge_labels: LongTensor [1, N, N]    (argmax over e, unsqueezed on batch dim)
-            intermediate_graphs: list[Data] (optional)
+        Example:
+        pinned_mask = [True, True, False, ...] ⇒ the types of nodes 0 and 1 are preserved, and the rest are re-sampled.
         """
         import torch
         import torch.nn.functional as F
         from torch_geometric.data import Data
 
-        # --- Setup ---
         num_nodes = data.x.size(0)
-        pinned_mask = pinned_mask.to(device).bool()
 
-        # Start with *no edges*: class 0 = "no-edge"
+        # Inicializa e sin aristas (todas clase 0 = no-edge).
         e = torch.zeros((num_nodes, num_nodes, self.edge_num_classes), device=device)
-        e[:, :, 0] = 1.0
+        e[:, :, 0] = 1
 
-        # Current node one-hot (contains pinned info already)
-        x = data.x.clone().to(device)
+        # x actual (arranca en data.x, que ya contiene la info pineada)
+        x = data.x.clone()
 
         intermediate_graphs = []
-        max_attempts = 20  # how many times we try to sample a valid edge matrix per timestep
 
-        # --- Reverse steps ---
         for t in range(self.T - 1, -1, -1):
-            # 1) Forward pass to get logits
             node_logits, edge_logits_list = self.forward(x, data.edge_index, data.batch, t)
 
-            # 2) Sample node types (but only for non-pinned nodes)
-            node_probs = F.softmax(node_logits, dim=1)                    # [N, C]
-            sampled_labels = torch.multinomial(node_probs, 1).squeeze(1)  # [N]
-            current_x_int = x.argmax(dim=1)                               # [N] current labels
+            node_probs = F.softmax(node_logits, dim=1)
+            sampled_labels = torch.multinomial(node_probs, num_samples=1).squeeze(1)  # (num_nodes,)
 
-            # Update only non-pinned nodes
-            current_x_int = current_x_int.masked_scatter(~pinned_mask, sampled_labels[~pinned_mask])
+            # Actualizamos x SOLO para nodos que no estén pineados
+            current_x_int = x.argmax(dim=1)  # entero
+            for i in range(num_nodes):
+                if not pinned_mask[i]:
+                    current_x_int[i] = sampled_labels[i]
+
             x = F.one_hot(current_x_int, num_classes=self.node_num_classes).float()
 
-            # 3) Sample edges with projection + *strong* validation (exact cardinalities)
+            # Muestreo de edges
             if edge_logits_list and edge_logits_list[0].numel() > 0:
-                edge_logits = edge_logits_list[0]                 # [N, N, 2]
-                edge_probs  = F.softmax(edge_logits, dim=-1)      # [N, N, 2]
+                edge_logits = edge_logits_list[0]  # (num_nodes, num_nodes, 2)
+                # edge_probs = F.softmax(edge_logits, dim=-1)
+                # candidate_edge_matrix = torch.multinomial(edge_probs.view(-1, self.edge_num_classes), 1).view(num_nodes,
+                #                                                                                               num_nodes)
+
+                # current_node_labels = x.argmax(dim=1)
+                # projected_edges = strict_projector_industrial(current_node_labels, candidate_edge_matrix, device)
+                # e = F.one_hot(projected_edges.long(), num_classes=self.edge_num_classes).float()
+                ######################
+                edge_probs = F.softmax(edge_logits, dim=-1)
+                max_attempts = 20
+                current_node_labels = x.argmax(dim=1)
 
                 found = False
-                current_node_labels = x.argmax(dim=1)             # [N]
+                if t in (1, 0):
+                    for attempt in range(max_attempts):
+                        candidate_edge_matrix = torch.multinomial(edge_probs.view(-1, self.edge_num_classes), 1).view(
+                            num_nodes,
+                            num_nodes)
 
-                # for _ in range(max_attempts):
-                    # Sample a 0/1 candidate from probs
-                candidate_edge_matrix = torch.multinomial(
-                    edge_probs.view(-1, self.edge_num_classes), 1
-                ).view(num_nodes, num_nodes)                  # [N, N] in {0,1}
+                        projected = strict_projector_industrial(current_node_labels, candidate_edge_matrix, device) \
+                            if self.use_projector else candidate_edge_matrix
+                        if validate_constraints(projected, current_node_labels, device, exact=True):
+                            e = F.one_hot(projected.long(), num_classes=self.edge_num_classes).float()
+                            found = True
+                            break
+                        # e = F.one_hot(projected.long(), num_classes=self.edge_num_classes).float()
+                        # 💡 qui il pezzo che mi chiedevi dove mettere:
+                else:
+                    candidate_edge_matrix = torch.multinomial(edge_probs.view(-1, self.edge_num_classes), 1).view(
+                        num_nodes,
+                        num_nodes)
 
-                # Project to enforce local "at most" constraints + no bidirectionals
-                projected_edges = strict_projector_industrial(
-                    current_node_labels, candidate_edge_matrix, device
-                ) if self.use_projector else candidate_edge_matrix
-
-                # IMPORTANT: use the strengthened validator with exact=True
-                # (Make sure your validate_constraints signature supports exact=True)
+                    projected = strict_projector_industrial(current_node_labels, candidate_edge_matrix, device) \
+                        if self.use_projector else candidate_edge_matrix
+                    e = F.one_hot(projected.long(), num_classes=self.edge_num_classes).float()
+                ######################
 
             if save_intermediate:
-                if validate_constraints(projected_edges, current_node_labels, device, exact=True):
-                    e = F.one_hot(projected_edges.long(), num_classes=self.edge_num_classes).float()
-                    found = True
-                    break
+                new_data = Data(
+                    x=x.clone(),
+                    edge_index=(e.argmax(dim=-1) > 0).nonzero(as_tuple=False).t().contiguous()
+                )
+                intermediate_graphs.append(new_data)
 
-                # If not found, keep previous 'e' (do NOT fallback to an invalid matrix)
+        final_node_labels = x.argmax(dim=1)
+        final_edge_labels = e.argmax(dim=-1)
 
-            # 4) Optionally record intermediate graph
-            if save_intermediate:
-                ei = (e.argmax(dim=-1) > 0).nonzero(as_tuple=False).t().contiguous()  # edge_index from adjacency
-                intermediate_graphs.append(Data(x=x.clone(), edge_index=ei))
-
-        # --- Final tensors ---
-        final_node_labels = x.argmax(dim=1)                # [N]
-        final_edge_labels = e.argmax(dim=-1).unsqueeze(0)  # [1, N, N]
-
-        return final_node_labels, final_edge_labels, intermediate_graphs
+        return final_node_labels, final_edge_labels.unsqueeze(0), intermediate_graphs
 
     
 
@@ -854,7 +850,7 @@ def _save_graphs_pt(tag: str, batch: list[dict], save_dir: Union[str, Path]) -> 
     import datetime as dt
 
     save_dir = Path(save_dir)
-    save_dir.mkdir(exist_ok=True)   
+    save_dir.mkdir(parents=True, exist_ok=True)
 
     adj_list, node_list = [], []
     for g in batch:
@@ -880,7 +876,7 @@ def _save_graphs_pt(tag: str, batch: list[dict], save_dir: Union[str, Path]) -> 
 def experiment_free(n_samples=300, n_nodes=15):
     batch = []
     t0 = time.time()
-    for _ in range(n_samples):
+    for _ in tqdm(range(n_samples)):
         model = LightweightIndustrialDiffusion(device=device).to(device)
         nodes, edges = model.generate_global_graph(n_nodes)
         batch.append({"nodes": nodes,
@@ -901,7 +897,7 @@ def experiment_allpinned(n_samples=300,
     numM,numB,numA,numD = inv
     batch = []
     t0 = time.time()
-    for _ in range(n_samples):
+    for _ in tqdm(range(n_samples)):
         model = LightweightIndustrialDiffusion(device=device).to(device)
         nodes, edges = model.generate_global_graph_all_pinned(
             num_machines=numM,
@@ -929,7 +925,7 @@ def experiment_allpinned(n_samples=300,
 def experiment_partial(n_samples=300, n_nodes=20, pin_ratio=0.3):
     batch = []
     t0 = time.time()
-    for _ in range(n_samples):
+    for _ in tqdm(range(n_samples)):
         pin_counts = {"MACHINE": 1,
                       "ASSEMBLY": 1,
                       "BUFFER": int(pin_ratio*n_nodes) - 2}

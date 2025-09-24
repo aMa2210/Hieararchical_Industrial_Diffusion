@@ -1,13 +1,19 @@
 import os
+from pathlib import Path
 import torch
 import torch.nn.functional as F
 from torch_geometric.data import Data
 from Industrial_Pipeline_Functions import LightweightIndustrialDiffusion
 from Petri_Pipeline_Functions import LightweightPetriDiffusion
 
-# Define constants for clarity
+# Constants
 MACHINE, BUFFER, ASSEMBLY, DISASSEMBLY = 0, 1, 2, 3
 
+# DIR_STITCHED = ROOT_IMG / "Stitched_Graph"
+
+
+# for d in [ROOT_IMG, DIR_INDUSTRIAL, DIR_PETRI, DIR_STITCHED]:
+#     d.mkdir(parents=True, exist_ok=True)
 
 class IntegratedDiffusionPipeline:
     def __init__(self, model_high, petri_models, device):
@@ -47,24 +53,25 @@ class IntegratedDiffusionPipeline:
     def generate_full_integrated_graph(self, n_nodes_global, n_nodes_petri=10, output_dir='integrated_graph'):
         os.makedirs(output_dir, exist_ok=True)
 
-        # global_node_types, global_edges = self.generate_global_graph(n_nodes_global)
+        # genera il grafico globale
         global_node_types, global_edges = self.generate_global_graph_all_pinned(3, 4, 1, 2)
         global_adj_matrix = global_edges.squeeze(0).cpu().numpy()
 
-        # also persist an industrial-only payload for external stitching/debug
-        os.makedirs('industrial_graph_for_stitch', exist_ok=True)
+        # anche salva un payload solo industriale per il debug
+        # os.makedirs('industrial_graph_for_stitch', exist_ok=True)
         global_graph_to_save = [({"nodes": global_node_types, "edges": global_adj_matrix})]
         import numpy as np, datetime as dt
         adj_list, node_list = [], []
         for g in global_graph_to_save:
-            adj_list.append(g["edges"].astype(np.uint8))                       # (n,n) -> uint8
-            node_list.append(g["nodes"].cpu().numpy().astype(np.int8))         # (n,)  -> int8
+            adj_list.append(g["edges"].astype(np.uint8))  # (n,n) -> uint8
+            node_list.append(g["nodes"].cpu().numpy().astype(np.int8))  # (n,)  -> int8
         LABEL2ID = {"MACHINE": 3, "BUFFER": 1, "ASSEMBLY": 0, "DISASSEMBLY": 2}
         payload = {"adjacency_matrices": adj_list, "node_types": node_list, "label2id": LABEL2ID}
         stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        fname = f'industrial_graph_for_stitch/{stamp}.pt'
+        fname = f'{output_dir}/{stamp}.pt'
         torch.save(payload, fname)
 
+        # costruzione del dizionario integrato
         integrated_graph = {
             "global_graph": {
                 "node_types": global_node_types.cpu().numpy(),
@@ -82,41 +89,39 @@ class IntegratedDiffusionPipeline:
                     "node_types": petri_node_types,
                     "adjacency_matrix": petri_adj_matrix
                 }
-            else:  # BUFFER → trivial subgraph
+            else:  # BUFFER → subgrafo triviale
                 integrated_graph["petri_subgraphs"][idx] = {
-                    "node_types":  [-1],           # a single place
-                    "adjacency_matrix": [[0]],     # no edges
-                    "in_places":  [0],
+                    "node_types": [-1],  # un singolo posto
+                    "adjacency_matrix": [[0]],  # nessuna connessione
+                    "in_places": [0],
                     "out_places": [0]
                 }
 
-        file_path = os.path.join(output_dir, 'integrated_graph.pt')
-        torch.save(integrated_graph, file_path)
-        print(f"✅ Integrated graph saved correctly in: {file_path}")
+        # Salvataggio nella cartella Stitched_Graph
+        # file_path = output_dir / f'integrated_graph_{stamp}.pt'
+        # torch.save(integrated_graph, file_path)
+
         return integrated_graph
 
     # ------------------------ All pinned (inventory) ---------------------------
-    def generate_global_graph_all_pinned(self, num_machines, num_buffers, num_assemblies, num_disassemblies):
+    def generate_global_graph_all_pinned(self, num_machines, num_buffers, num_assemblies, num_disassemblies): #2 8 2 2
         total_nodes = num_machines + num_buffers + num_assemblies + num_disassemblies
-        node_types_list = (
-            [MACHINE] * num_machines +
-            [BUFFER] * num_buffers +
-            [ASSEMBLY] * num_assemblies +
-            [DISASSEMBLY] * num_disassemblies
-        )
+        node_types_list = ([MACHINE] * num_machines +
+                        [BUFFER] * num_buffers +
+                        [ASSEMBLY] * num_assemblies +
+                        [DISASSEMBLY] * num_disassemblies)
 
         perm = torch.randperm(total_nodes)
         pinned_types = torch.tensor(node_types_list, device=self.device)[perm]
         pinned_x = F.one_hot(pinned_types, num_classes=self.model_high.node_num_classes).float()
+
         pinned_mask = torch.ones(total_nodes, dtype=torch.bool, device=self.device)
 
         edge_index = torch.empty((2, 0), dtype=torch.long, device=self.device)
         data = Data(x=pinned_x, edge_index=edge_index)
         data.batch = torch.zeros(total_nodes, dtype=torch.long, device=self.device)
 
-        final_nodes, final_edges, _ = self.model_high.reverse_diffusion_single_counts(
-            data, pinned_mask, self.device, False
-        )
+        final_nodes, final_edges, _ = self.model_high.reverse_diffusion_single_counts(data, pinned_mask, self.device, False)
         return final_nodes, final_edges
 
     # --------------------------- Partial pinned -------------------------------
@@ -155,7 +160,8 @@ class IntegratedDiffusionPipeline:
         return final_nodes, final_edges
 
     # ------------------------------ Batch builder -----------------------------
-    def generate_multiple_integrated_graphs(self, num_graphs, n_nodes_global, n_nodes_petri=10, output_dir='integrated_graphs_batch'):
+    def generate_multiple_integrated_graphs(self, num_graphs, n_nodes_global, n_nodes_petri=10,
+                                            output_dir='integrated_graphs_batch'):
         os.makedirs(output_dir, exist_ok=True)
         for graph_idx in range(num_graphs):
             global_node_types, global_edges = self.generate_global_graph(n_nodes_global)
@@ -179,27 +185,17 @@ class IntegratedDiffusionPipeline:
                     }
                 else:
                     integrated_graph["petri_subgraphs"][idx] = {
-                        "node_types":  [-1],
+                        "node_types": [-1],
                         "adjacency_matrix": [[0]],
-                        "in_places":  [0],
+                        "in_places": [0],
                         "out_places": [0]
                     }
 
             file_path = os.path.join(output_dir, f'integrated_graph_{graph_idx}.pt')
             torch.save(integrated_graph, file_path)
-            print(f"✅ Integrated graph #{graph_idx} saved correctly in: {file_path}")
 
     # ------------------------------- Stitch -----------------------------------
     def stitch(self, path, save_path=None, device='cpu'):
-        """
-        Merge the global plant graph with all Petri subgraphs into a single torch_geometric.data.Data.
-
-        * Each BUFFER is modeled only with a single Place (P_buf).
-        * External connections:
-            - BUFFER as source:  P_buf -> in-transitions(dst)
-            - BUFFER as target:  out-transition(src) -> P_buf
-        * Normal subgraphs: all out_places(src) connect to all in_transitions(dst).
-        """
         PLACE, TRANS = 0, 1
         integ = torch.load(path, map_location=device)
         g_adj = torch.tensor(integ["global_graph"]["adjacency_matrix"])
@@ -231,29 +227,26 @@ class IntegratedDiffusionPipeline:
             edges += [(loc2glob[u.item()], loc2glob[v.item()]) for u, v in zip(r, c)]
 
             places = [i for i, t in enumerate(sub["node_types"]) if t in (0, -1)]
-            trans  = [i for i, t in enumerate(sub["node_types"]) if t == 1]
+            trans = [i for i, t in enumerate(sub["node_types"]) if t == 1]
 
             out_p = [i for i in places if A[i].sum() == 0] or [places[-1]]
-            in_t  = [j for j in trans if A[:, j].sum() == 0] or ([trans[0]] if trans else [])
+            in_t = [j for j in trans if A[:, j].sum() == 0] or ([trans[0]] if trans else [])
 
             out_places[n_id] = [loc2glob[i] for i in out_p]
-            in_trans[n_id]  = [loc2glob[j] for j in in_t]
+            in_trans[n_id] = [loc2glob[j] for j in in_t]
             trans_src[n_id] = [loc2glob[j] for j in trans]
 
         # 2) wire according to global graph
         rows, cols = torch.where(g_adj)
         for src, dst in zip(rows.tolist(), cols.tolist()):
-            # normal → normal
             for p in out_places[src]:
                 for t in in_trans[dst]:
                     edges.append((p, t))
-            # BUFFER as source
             if src in buffer_place:
                 p_buf = buffer_place[src]
                 for t in in_trans.get(dst, []):
                     edges.append((p_buf, t))
                 continue
-            # BUFFER as target
             if dst in buffer_place:
                 p_buf = buffer_place[dst]
                 if trans_src[src]:
@@ -262,7 +255,6 @@ class IntegratedDiffusionPipeline:
                     edges.append((best_t, p_buf))
                 continue
 
-        # 3) Data
         edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
         x = torch.zeros(len(all_types), 2, device=device)
         x[torch.arange(len(all_types)), all_types] = 1
@@ -274,6 +266,5 @@ class IntegratedDiffusionPipeline:
             if save_dir:
                 os.makedirs(save_dir, exist_ok=True)
             torch.save(stitched, save_path)
-            print(f"✅ Global Petri net saved in {save_path}")
 
         return stitched

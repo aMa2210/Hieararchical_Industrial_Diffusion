@@ -21,14 +21,14 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # ---------- 1) GENERATION ----------
 # Choose ONE experiment:
 
-experiment_setting = 'E1'
+experiment_setting = 'E3'
 
 if experiment_setting == 'E1':
-    file_name_output = experiment_free(n_samples=10, n_nodes=11)              # creates E1_*.pt
+    file_name_output = experiment_free(n_samples=300, n_nodes=15)              # creates E1_*.pt
 elif experiment_setting == 'E2':
-    file_name_output = experiment_allpinned(n_samples=10, inv=(3,4,2,1))          # creates E2_*.pt
+    file_name_output = experiment_allpinned(n_samples=300, inv=(3,4,2,1))          # creates E2_*.pt
 elif experiment_setting == 'E3':
-    file_name_output = experiment_partial(n_samples=10, n_nodes=20, pin_ratio=0.3)  # creates E3_*.pt
+    file_name_output = experiment_partial(n_samples=300, n_nodes=15, pin_ratio=0.3)  # creates E3_*.pt
 
 # Save the generated graphs with a specific name
 import datetime

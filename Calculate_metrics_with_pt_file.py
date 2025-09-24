@@ -7,7 +7,9 @@ from Industrial_Pipeline_Functions import IndustrialGraphDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric.data import Batch
 import numpy as np
-from Ablation_Runs import GraphEncoder, wl_hash,encode_graphs,frechet,frechet,mmd_rbf,_embed_dataset
+import os
+import pandas as pd
+
 
 def convert_samples_compare(samples_compare, device="cpu"):
     adj_list = samples_compare["adjacency_matrices"]
@@ -26,100 +28,117 @@ def convert_samples_compare(samples_compare, device="cpu"):
     return converted
 
 def main():
-    # pt_path = 'ablation_runs_new/baseline/samples.pt'
-    # samples = torch.load(pt_path)
-    # results = calculate_metrics_pt_file(samples)
+
+    # pt_path_compare = 'exp_outputs/300_samples/E3.pt'
+    # samples_compare = torch.load(pt_path_compare)
+    # converted_samples = convert_samples_compare(samples_compare)
+    #
+    # results = calculate_metrics_pt_file(converted_samples)
     # print(results)
+#############################
+    folder_path = 'exp_outputs/300_samples'
+    output_csv = 'exp_outputs/300_samples/results.csv'
 
-    pt_path_compare = 'exp_outputs/300_samples/E3.pt'
-    samples_compare = torch.load(pt_path_compare)
-    converted_samples = convert_samples_compare(samples_compare)
+    results_list = []
 
-    results = calculate_metrics_pt_file(converted_samples)
-    print(results)
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.pt'):
+            file_path = os.path.join(folder_path, filename)
+            print(f"Processing {file_path} ...")
 
+            samples = torch.load(file_path)
+            converted_samples = convert_samples_compare(samples)
+            result = calculate_metrics_pt_file(converted_samples)
+
+            result['file'] = filename
+            print(result)
+            results_list.append(result)
+
+    df = pd.DataFrame(results_list)
+    df.to_csv(output_csv, index=False)
+    print(f"Results saved to {output_csv}")
 
 Dataset_path = 'industrial_dataset'
 
-# class GraphEncoder(torch.nn.Module):
-#     """Mini-GIN → mean-pool → linear  (128-D por defecto)."""
-#
-#     def __init__(self, in_dim=4, hid=64, out=128):
-#         super().__init__()
-#         mlp = torch.nn.Sequential(torch.nn.Linear(in_dim, hid),
-#                                   torch.nn.ReLU(),
-#                                   torch.nn.Linear(hid, hid))
-#         self.conv = GINConv(mlp)
-#         self.lin = torch.nn.Linear(hid, out)
-#
-#     def forward(self, batch):
-#         h = self.conv(batch.x, batch.edge_index)
-#         h = global_mean_pool(h, batch.batch)  # (B, hid)
-#         return self.lin(h)  # (B, out)
+class GraphEncoder(torch.nn.Module):
+    """Mini-GIN → mean-pool → linear  (128-D por defecto)."""
+
+    def __init__(self, in_dim=4, hid=64, out=128):
+        super().__init__()
+        mlp = torch.nn.Sequential(torch.nn.Linear(in_dim, hid),
+                                  torch.nn.ReLU(),
+                                  torch.nn.Linear(hid, hid))
+        self.conv = GINConv(mlp)
+        self.lin = torch.nn.Linear(hid, out)
+
+    def forward(self, batch):
+        h = self.conv(batch.x, batch.edge_index)
+        h = global_mean_pool(h, batch.batch)  # (B, hid)
+        return self.lin(h)  # (B, out)
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ENC = GraphEncoder(in_dim=4).to(device).eval()
 
 
-# def wl_hash(nodes, edges):
-#     G = nx.Graph()
-#     for i, t in enumerate(nodes.tolist()):
-#         G.add_node(int(i), label=int(t))
-#     for i, j in (edges.nonzero(as_tuple=False)):
-#         G.add_edge(int(i), int(j))
-#     return nx.weisfeiler_lehman_graph_hash(G, node_attr="label")
+def wl_hash(nodes, edges):
+    G = nx.Graph()
+    for i, t in enumerate(nodes.tolist()):
+        G.add_node(int(i), label=int(t))
+    for i, j in (edges.nonzero(as_tuple=False)):
+        G.add_edge(int(i), int(j))
+    return nx.weisfeiler_lehman_graph_hash(G, node_attr="label")
 
 
-# @torch.no_grad()
-# def encode_graphs(list_dicts, encoder, device='cpu', bs=64):
-#     """Convierte tu lista de dicts {'nodes','edges'} en embeddings."""
-#     data_objs = []
-#     for g in list_dicts:
-#         x = torch.nn.functional.one_hot(g["nodes"], num_classes=4).float()
-#         edge_idx = (g["edges"] > 0).nonzero(as_tuple=False).t().contiguous()
-#         from torch_geometric.data import Data
-#         data_objs.append(Data(x=x, edge_index=edge_idx))
-#     loader = DataLoader(data_objs, bs, shuffle=False,
-#                         collate_fn=Batch.from_data_list)
-#     Z = []
-#     for batch in loader:
-#         Z.append(encoder(batch.to(device)).cpu())
-#     return torch.cat(Z, 0)  # (N, d)
+@torch.no_grad()
+def encode_graphs(list_dicts, encoder, device='cpu', bs=64):
+    """Convierte tu lista de dicts {'nodes','edges'} en embeddings."""
+    data_objs = []
+    for g in list_dicts:
+        x = torch.nn.functional.one_hot(g["nodes"], num_classes=4).float()
+        edge_idx = (g["edges"] > 0).nonzero(as_tuple=False).t().contiguous()
+        from torch_geometric.data import Data
+        data_objs.append(Data(x=x, edge_index=edge_idx))
+    loader = DataLoader(data_objs, bs, shuffle=False,
+                        collate_fn=Batch.from_data_list)
+    Z = []
+    for batch in loader:
+        Z.append(encoder(batch.to(device)).cpu())
+    return torch.cat(Z, 0)  # (N, d)
 
 
-# def cov_sqrt(mat, eps=1e-8):
-#     # mat: (d,d) simétrica PSD
-#     evals, evecs = torch.linalg.eigh(mat)
-#     evals_clamped = torch.clamp(evals, min=0.)  # num. safety
-#     return (evecs * evals_clamped.sqrt()) @ evecs.t()
-#
-#
-# def frechet(mu1, cov1, mu2, cov2):
-#     diff = mu1 - mu2
-#     covmean = cov_sqrt(cov1 @ cov2)
-#     return diff.dot(diff) + torch.trace(cov1 + cov2 - 2 * covmean)
-#
-#
-# def mmd_rbf(X, Y):
-#     # bandwidth heurístico (mediana)
-#     Z = torch.cat([X, Y], 0)
-#     sq = torch.cdist(Z, Z, p=2.0) ** 2
-#     sigma = torch.sqrt(0.5 * sq[sq > 0].median())
-#     k = lambda A, B: torch.exp(-torch.cdist(A, B, p=2.0) ** 2 / (2 * sigma ** 2))
-#     m, n = len(X), len(Y)
-#     return (k(X, X).sum() - m) / (m * (m - 1)) \
-#            + (k(Y, Y).sum() - n) / (n * (n - 1)) \
-#            - 2 * k(X, Y).mean()
-#
-#
-# def _embed_dataset(dataset):
-#     objs = []
-#     for d in dataset:
-#         x_lbl = d.x.argmax(1)
-#         dense = to_dense_adj(d.edge_index, max_num_nodes=d.x.size(0))[0]
-#         objs.append({"nodes": x_lbl, "edges": dense})
-#     return encode_graphs(objs, ENC, device)
+def cov_sqrt(mat, eps=1e-8):
+    # mat: (d,d) simétrica PSD
+    evals, evecs = torch.linalg.eigh(mat)
+    evals_clamped = torch.clamp(evals, min=0.)  # num. safety
+    return (evecs * evals_clamped.sqrt()) @ evecs.t()
+
+
+def frechet(mu1, cov1, mu2, cov2):
+    diff = mu1 - mu2
+    covmean = cov_sqrt(cov1 @ cov2)
+    return diff.dot(diff) + torch.trace(cov1 + cov2 - 2 * covmean)
+
+
+def mmd_rbf(X, Y):
+    # bandwidth heurístico (mediana)
+    Z = torch.cat([X, Y], 0)
+    sq = torch.cdist(Z, Z, p=2.0) ** 2
+    sigma = torch.sqrt(0.5 * sq[sq > 0].median())
+    k = lambda A, B: torch.exp(-torch.cdist(A, B, p=2.0) ** 2 / (2 * sigma ** 2))
+    m, n = len(X), len(Y)
+    return (k(X, X).sum() - m) / (m * (m - 1)) \
+           + (k(Y, Y).sum() - n) / (n * (n - 1)) \
+           - 2 * k(X, Y).mean()
+
+
+def _embed_dataset(dataset):
+    objs = []
+    for d in dataset:
+        x_lbl = d.x.argmax(1)
+        dense = to_dense_adj(d.edge_index, max_num_nodes=d.x.size(0))[0]
+        objs.append({"nodes": x_lbl, "edges": dense})
+    return encode_graphs(objs, ENC, device)
 
 
 def calculate_metrics_pt_file(samples):

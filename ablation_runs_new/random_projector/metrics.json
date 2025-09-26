@@ -1,9 +1,9 @@
 {
-  "validity": 0.38,
+  "validity": 0.23333333333333328,
   "uniqueness": 1.0,
   "novelty": 1.0,
-  "fid": 0.2643839239459093,
-  "mmd": 0.7045477628707886,
+  "fid": 0.24418083897613055,
+  "mmd": 0.7085756659507751,
   "run_dir": "ablation_runs_new\\random_projector",
   "model_id": "random_projector",
   "weights_path": "ablation_runs_new\\random_projector\\model.pth",

@@ -61,19 +61,49 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MACHINE, BUFFER, ASSEMBLY, DISASSEMBLY = 0, 1, 2, 3
 
 
+# def get_forbidden_mask(node_labels, device):
+#     n = node_labels.size(0)
+#     diag_mask = torch.eye(n, dtype=torch.bool, device=device)
+#
+#     allowed_mask = torch.ones((n, n), dtype=torch.bool, device=device)
+#     for i in range(n):
+#         for j in range(n):
+#             if node_labels[i] == 1 and node_labels[j] == 1:  # BUFFER-BUFFER forbidden
+#                 allowed_mask[i, j] = False
+#
+#
+#     buf = (node_labels == BUFFER)
+#     m_idx = torch.where(node_labels == MACHINE)[0]
+#     asm_idx = torch.where(node_labels == ASSEMBLY)[0]
+#     dis_idx = torch.where(node_labels == DISASSEMBLY)[0]
+#     for i in m_idx:
+#         buf_indices = torch.where(buf)[0]
+#         if len(buf_indices) > 0:
+#             allowed_mask[i, buf_indices[0]] = True
+#
+#
+#
+#     forbidden_mask = diag_mask | (~allowed_mask)
+#     return forbidden_mask.float()
+
+
 def get_forbidden_mask(node_labels, device):
     n = node_labels.size(0)
-    diag_mask = torch.eye(n, dtype=torch.bool, device=device)
+    diag_mask = torch.eye(n, dtype=torch.bool, device=device)  # 自环禁止
 
-    allowed_mask = torch.ones((n, n), dtype=torch.bool, device=device)
+    buf = (node_labels == BUFFER)
+    allowed_mask = torch.zeros((n, n), dtype=torch.bool, device=device)
+
     for i in range(n):
         for j in range(n):
-            if node_labels[i] == 1 and node_labels[j] == 1:  # BUFFER-BUFFER forbidden
-                allowed_mask[i, j] = False
+            if buf[i] or buf[j]:
+                if buf[i] != buf[j]:
+                    allowed_mask[i, j] = True
 
+    # 禁止自环
     forbidden_mask = diag_mask | (~allowed_mask)
-    return forbidden_mask.float()
 
+    return forbidden_mask.float()
 
 # def validate_constraints(edge_matrix, node_labels, device):
 #     """
@@ -369,7 +399,7 @@ def compute_batch_loss(model, batch_data, T, device, edge_weight, node_marginal,
         data_i = Data(x=x_t, edge_index=edge_index_noisy)
         data_i.batch = torch.zeros(x_t.size(0), dtype=torch.long, device=device)
         node_logits, edge_logits_list = model(data_i.x, data_i.edge_index, data_i.batch, t=t_i)
-        
+
         loss_node = F.cross_entropy(node_logits, x0.to(device))
         
         if edge_logits_list and edge_logits_list[0].numel() > 0:
@@ -399,7 +429,25 @@ def compute_batch_loss(model, batch_data, T, device, edge_weight, node_marginal,
         else:
             constraint_loss = 0.0
 
-        loss = loss_node + loss_edge + kl_lambda * (kl_node + kl_edge) + constraint_lambda * constraint_loss
+        x_labels = torch.multinomial(node_probs, num_samples=1).squeeze(1)
+        x = F.one_hot(x_labels, num_classes=model.node_num_classes).float()
+        if edge_logits_list and edge_logits_list[0].numel() > 0:
+            edge_logits = edge_logits_list[0]
+            edge_probs = F.softmax(edge_logits, dim=-1)
+            flat_probs = edge_probs.view(-1, model.edge_num_classes)
+            current_node_labels = x.argmax(dim=1)
+            sampled_flat = torch.multinomial(flat_probs, num_samples=1).view(-1)
+            candidate_edge_matrix = sampled_flat.view(true_n, true_n)
+            projected = candidate_edge_matrix
+            if not validate_constraints(projected, current_node_labels, device, exact=True):
+                constraint_validate_loss = torch.tensor(0.02)
+            else:
+                constraint_validate_loss = torch.tensor(0)
+
+        # constraint_validate_loss = 0
+
+
+        loss = loss_node + loss_edge + kl_lambda * (kl_node + kl_edge) + constraint_lambda * constraint_loss + constraint_lambda * constraint_validate_loss
         total_loss += loss
         count += 1
 
@@ -873,11 +921,13 @@ def _save_graphs_pt(tag: str, batch: list[dict], save_dir: Union[str, Path]) -> 
 # --------------------------------------------------------------------------
 # Experiment E1 – free generation
 # --------------------------------------------------------------------------
-def experiment_free(n_samples=300, n_nodes=15):
+def experiment_free(n_samples=300, n_nodes=15, plant_model_path = "ablation_runs_new/baseline/model.pth"):
     batch = []
     t0 = time.time()
     for _ in tqdm(range(n_samples)):
         model = LightweightIndustrialDiffusion(device=device).to(device)
+        model.load_state_dict(torch.load(plant_model_path,
+                                               map_location=device))
         nodes, edges = model.generate_global_graph(n_nodes)
         batch.append({"nodes": nodes,
                       "edges": edges.squeeze(0)})
@@ -893,12 +943,14 @@ def experiment_free(n_samples=300, n_nodes=15):
 # Experiment E2 – all-pinned inventory
 # --------------------------------------------------------------------------
 def experiment_allpinned(n_samples=300,
-                         inv=(3,4,2,1)):   # (M, B, A, D)
+                         inv=(3,4,2,1), plant_model_path = "ablation_runs_new/baseline/model.pth"):   # (M, B, A, D)
     numM,numB,numA,numD = inv
     batch = []
     t0 = time.time()
     for _ in tqdm(range(n_samples)):
         model = LightweightIndustrialDiffusion(device=device).to(device)
+        model.load_state_dict(torch.load(plant_model_path,
+                                               map_location=device))
         nodes, edges = model.generate_global_graph_all_pinned(
             num_machines=numM,
             num_buffers=numB,
@@ -922,7 +974,7 @@ def experiment_allpinned(n_samples=300,
 # --------------------------------------------------------------------------
 # Experiment E3 – partial-pinned (30 % nodes)
 # --------------------------------------------------------------------------
-def experiment_partial(n_samples=300, n_nodes=20, pin_ratio=0.3):
+def experiment_partial(n_samples=300, n_nodes=20, pin_ratio=0.3, plant_model_path = "ablation_runs_new/baseline/model.pth"):
     batch = []
     t0 = time.time()
     for _ in tqdm(range(n_samples)):
@@ -930,6 +982,8 @@ def experiment_partial(n_samples=300, n_nodes=20, pin_ratio=0.3):
                       "ASSEMBLY": 1,
                       "BUFFER": int(pin_ratio*n_nodes) - 2}
         model = LightweightIndustrialDiffusion(device=device).to(device)
+        model.load_state_dict(torch.load(plant_model_path,
+                                               map_location=device))
         nodes, edges = model.generate_global_graph_partial_pinned(
             num_nodes=n_nodes,
             pinned_info=pin_counts)

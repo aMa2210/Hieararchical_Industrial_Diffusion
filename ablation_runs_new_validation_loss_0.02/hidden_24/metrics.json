@@ -1,0 +1,16 @@
+{
+  "validity": 0.6599999999999999,
+  "uniqueness": 0.7,
+  "novelty": 1.0,
+  "fid": -0.008034728770630134,
+  "mmd": 0.81679368019104,
+  "run_dir": "ablation_runs_new\\hidden_24",
+  "model_id": "hidden_24",
+  "weights_path": "ablation_runs_new\\hidden_24\\model.pth",
+  "did_train": 1,
+  "name": "hidden_24",
+  "hidden_dim": 24,
+  "kl": 0.1,
+  "constraint": 1.0,
+  "use_projector": true
+}

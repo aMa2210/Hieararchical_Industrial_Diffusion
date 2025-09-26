@@ -10,6 +10,7 @@ import numpy as np
 # file_path="petri_assembly_dataset/raw/train.pt"
 # file_path = "exp_outputs/E2_20250916_161959.pt"
 file_path = 'industrial_graph_for_stitch/20250917_162804.pt'
+file_path = 'ablation_runs_new/baseline/samples.pt'
 max_graphs_to_show = 10  # max visualization data
 
 node_styles = {

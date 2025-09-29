@@ -6,11 +6,8 @@ import numpy as np
 # -----------------------------
 # 配置
 # -----------------------------
-# file_path = "petri_assembly_dataset/processed/train_processed.pt"
-# file_path="petri_assembly_dataset/raw/train.pt"
-# file_path = "exp_outputs/E2_20250916_161959.pt"
-file_path = 'industrial_graph_for_stitch/20250917_162804.pt'
-# file_path = 'ablation_runs_new/baseline/samples.pt'
+file_path = 'industrial_dataset/raw/graphs_data.pt'
+# file_path = 'ablation_runs_new/no_projector/samples.pt'
 max_graphs_to_show = 10  # max visualization data
 
 node_styles = {
@@ -25,10 +22,19 @@ node_styles = {
 # 加载图数据
 # -----------------------------
 data = torch.load(file_path)
-adj_matrices = data["adjacency_matrices"]
-node_types   = data["node_types"]
-label2id     = data["label2id"]
-id2label     = {v:k for k,v in label2id.items()}
+# print(type(data), len(data))
+# print(data[0])
+
+# print(type(data))
+# print(data.keys() if isinstance(data, dict) else len(data))
+# adj_matrices = data["adjacency_matrices"]
+# node_types   = data["node_types"]
+# label2id     = data["label2id"]
+# id2label     = {v:k for k,v in label2id.items()}
+node_types   = [nt.numpy() if isinstance(nt, torch.Tensor) else np.array(nt)
+                for nt in data["node_types"]]
+adj_matrices = [am.numpy() if isinstance(am, torch.Tensor) else np.array(am)
+                for am in data["adjacency_matrices"]]
 
 print(f"Loaded {len(adj_matrices)} graphs from {file_path}")
 
@@ -50,7 +56,8 @@ for i in range(num_graphs):
 
     # 按节点类型绘制
     for ntype, props in node_styles.items():
-        nodelist = [idx for idx, t in enumerate(types) if t == ntype]
+        label = props['label']
+        nodelist = [idx for idx, t in enumerate(types) if t == label]
         nx.draw_networkx_nodes(G, pos,
                                nodelist=nodelist,
                                node_shape=props['marker'],

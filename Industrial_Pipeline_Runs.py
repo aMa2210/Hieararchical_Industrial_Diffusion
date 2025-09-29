@@ -21,7 +21,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # ---------- 1) GENERATION ----------
 # Choose ONE experiment:
 
-experiment_setting = 'E1'
+experiment_setting = 'E3'
 plant_model_path = 'ablation_runs_new/baseline/model.pth'
 if experiment_setting == 'E1':
     file_name_output = experiment_free(n_samples=300, n_nodes=15, plant_model_path = plant_model_path)              # creates E1_*.pt

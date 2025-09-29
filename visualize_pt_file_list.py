@@ -9,8 +9,8 @@ import numpy as np
 # file_path = "petri_assembly_dataset/processed/train_processed.pt"
 # file_path="petri_assembly_dataset/raw/train.pt"
 # file_path = "exp_outputs/E2_20250916_161959.pt"
-file_path = 'industrial_graph_for_stitch/20250917_162804.pt'
-# file_path = 'ablation_runs_new/baseline/samples.pt'
+# file_path = 'industrial_graph_for_stitch/20250917_162804.pt'
+file_path = 'ablation_runs_new/no_projector/samples.pt'
 max_graphs_to_show = 10  # max visualization data
 
 node_styles = {
@@ -25,10 +25,14 @@ node_styles = {
 # 加载图数据
 # -----------------------------
 data = torch.load(file_path)
-adj_matrices = data["adjacency_matrices"]
-node_types   = data["node_types"]
-label2id     = data["label2id"]
-id2label     = {v:k for k,v in label2id.items()}
+# print(type(data))
+# print(data.keys() if isinstance(data, dict) else len(data))
+# adj_matrices = data["adjacency_matrices"]
+# node_types   = data["node_types"]
+# label2id     = data["label2id"]
+# id2label     = {v:k for k,v in label2id.items()}
+node_types     = [pair[0].numpy() for pair in data]   # 每个 tuple 的第 0 个是 node_types
+adj_matrices   = [pair[1].numpy() for pair in data]   # 每个 tuple 的第 1 个是邻接矩阵
 
 print(f"Loaded {len(adj_matrices)} graphs from {file_path}")
 

@@ -39,6 +39,9 @@ def main():
     folder_path = 'exp_outputs/300_samples'
     output_csv = 'exp_outputs/300_samples/results.csv'
 
+    # folder_path = 'exp_outputs/E1/pt_file'
+    # output_csv = 'exp_outputs/E1/pt_file/results.csv'
+
     results_list = []
 
     for filename in os.listdir(folder_path):

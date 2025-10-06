@@ -18,17 +18,21 @@ from Industrial_Pipeline_Functions import (
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# ---------- 1) GENERATION ----------
+# ---------- 1) GENERATION ----------n
 # Choose ONE experiment:
 
-experiment_setting = 'E3'
-plant_model_path = 'ablation_runs_new/baseline/model.pth'
-if experiment_setting == 'E1':
-    file_name_output = experiment_free(n_samples=300, n_nodes=15, plant_model_path = plant_model_path)              # creates E1_*.pt
-elif experiment_setting == 'E2':
-    file_name_output = experiment_allpinned(n_samples=300, inv=(3,4,2,1), plant_model_path = plant_model_path)          # creates E2_*.pt
-elif experiment_setting == 'E3':
-    file_name_output = experiment_partial(n_samples=300, n_nodes=15, pin_ratio=0.3, plant_model_path = plant_model_path)  # creates E3_*.pt
+# experiment_settings = ['E1', 'E2', 'E3']
+experiment_settings = ['E2']
+# plant_model_path = 'ablation_runs_new_guidance_30epoch_repeat1-3/baseline/model.pth'
+# plant_model_path = 'ablation_runs_new_guidance_30epoch_repeat1-3/baseline/model.pth'
+plant_model_path = 'ablation_runs_new_no_guidance_epoch_60/baseline/model.pth'
+for experiment_setting in experiment_settings:
+    if experiment_setting == 'E1':
+        file_name_output = experiment_free(n_samples=300, n_nodes=15, plant_model_path = plant_model_path)              # creates E1_*.pt
+    elif experiment_setting == 'E2':
+        file_name_output = experiment_allpinned(n_samples=300, inv=(3,4,2,1), plant_model_path = plant_model_path)          # creates E2_*.pt
+    elif experiment_setting == 'E3':
+        file_name_output = experiment_partial(n_samples=300, n_nodes=15, pin_ratio=0.3, plant_model_path = plant_model_path)  # creates E3_*.pt
 
 # Save the generated graphs with a specific name
 import datetime

@@ -91,17 +91,40 @@ def mmd_rbf(X, Y):
 
 
 import networkx as nx
-ROOT_OUT = Path("ablation_runs_new")
+ROOT_OUT = Path("ablation_runs_new_weight_0.5_guidance")
 ROOT_OUT.mkdir(exist_ok=True)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATASET = IndustrialGraphDataset(root="industrial_dataset")
+### WEIGHTED TRAINING
+import pandas as pd # get the metric file for the training dataset to determine which data should be repeated
+from sklearn.preprocessing import MinMaxScaler
+df = pd.read_csv('Figure_Simulation/20250929_175625/training_labels.csv')
+df['throughput_per_node'] = df['throughput'] / df['num_non_buffer_nodes']
+df['energy_per_node'] = df['total_energy'] / df['num_non_buffer_nodes']
+scaler = MinMaxScaler()
+df[['throughput_norm', 'energy_norm']] = scaler.fit_transform(df[['throughput_per_node', 'energy_per_node']])
+weight_throughput = 0.5
+weight_energy = 1-weight_throughput
+df['score'] = weight_throughput * df['throughput_norm'] - weight_energy * df['energy_norm'] # using '-' the minus before df['energy_norm'] because the less it is the better
+
+min_repeat = 1
+max_repeat = 3
+score_norm = (df['score'] - df['score'].min()) / (df['score'].max() - df['score'].min())
+df['repeat'] = (score_norm * (max_repeat - min_repeat) + min_repeat).round().astype(int)
+
+repeat_list = df['repeat'].tolist()
+DATASET.weighted_repeat_inplace(repeat_list=repeat_list)
+### WEIGHTED TRAINING END
+
 LOADER  = DataLoader(DATASET, batch_size=4, shuffle=True)
+
 
 EDGE_W  = compute_edge_weights(DATASET, DEVICE)
 NODE_M, EDGE_M = compute_marginal_probs(DATASET, DEVICE)
 
-EPOCHS = 30         
+EPOCHS = 30
+# EPOCHS = 60
 T_STEPS = 100
 N_SAMP  = 300        
 

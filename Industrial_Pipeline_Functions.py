@@ -44,6 +44,18 @@ class IndustrialGraphDataset(InMemoryDataset):
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
+    def weighted_repeat_inplace(self, repeat_list):
+        assert len(repeat_list) == len(self), "length of repeat_list must equal to the length of the dataset"
+
+        data_list = [self.get(i) for i in range(len(self))]
+        new_data_list = []
+        for data, repeat_times in zip(data_list, repeat_list):
+            for _ in range(repeat_times):
+                new_data_list.append(data.clone())
+
+        self.data, self.slices = self.collate(new_data_list)
+        print(f"Dataset length changed from {len(data_list)} to {len(new_data_list)}")
+
 
 # 2 Industrial Diffusion Model
 import torch
@@ -440,7 +452,7 @@ def compute_batch_loss(model, batch_data, T, device, edge_weight, node_marginal,
             candidate_edge_matrix = sampled_flat.view(true_n, true_n)
             projected = candidate_edge_matrix
             if not validate_constraints(projected, current_node_labels, device, exact=True):
-                constraint_validate_loss = torch.tensor(0.02)
+                constraint_validate_loss = torch.tensor(0.01)
             else:
                 constraint_validate_loss = torch.tensor(0)
 

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 from datetime import datetime
-
+from typing import Dict, Any, List
 
 # --- Data Loading ---
 def load_data(pt_path):
@@ -307,6 +307,25 @@ def run_simulation_for_dataset(dataset_path):
         
     return simulation_results
 
+
+def save_labels_for_dataset(dataset_path: str, results: List[Dict[str, Any]]):
+    """
+    save a csv file with the metric labels
+    """
+    if not results:
+        print(f"No results to save for {dataset_path}")
+        return
+
+    base_name = os.path.splitext(os.path.basename(dataset_path))[0]
+    csv_path = os.path.join(SAVE_PATH, f"{base_name}_labels.csv")
+
+    df = pd.DataFrame(results)
+
+    df = df.sort_values(by=["design_id"]).reset_index(drop=True)
+    df.to_csv(csv_path, index=False)
+    print(f"Saved labels CSV: {csv_path}")
+
+
 def create_plots(dataset_results, datasets_with_colors):
     # Create normalized plot (by non-buffer nodes)
     plt.figure(figsize=(12, 8))
@@ -382,7 +401,8 @@ def main():
         results = run_simulation_for_dataset(dataset_path)
         all_results.extend(results)
         dataset_results[dataset_path] = results
-        
+        save_labels_for_dataset(dataset_path, results)
+
         if results:
             avg_throughput = sum(r["throughput"] for r in results) / len(results)
             avg_energy = sum(r["total_energy"] for r in results) / len(results)
